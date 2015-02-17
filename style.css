@@ -1,0 +1,31 @@
+
+div.approval {
+  margin: 0;
+  width: auto !important;
+  min-height: 20px;
+  padding: 2px 10px;
+
+  border-radius: 0;
+
+  position: absolute;
+  right:0;
+  top:0;
+}
+
+div.approved_yes {
+  background-color: #dfd;
+}
+
+div.approved_no {
+  background-color: #fdd;
+}
+
+div.approval span {
+  font-weight: bold;
+}
+
+div.approval a {
+	margin-left: 1em;
+}
+
+
