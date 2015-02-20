@@ -1,0 +1,7 @@
+base approve
+author Szymon Olewniczak
+email dokuwiki@imz.re
+date 2015-02-20
+name approve
+desc 
+url http://www.dokuwiki.org/plugin:approve
