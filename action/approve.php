@@ -28,7 +28,7 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
 
 	function can_approve() {
 		global $ID;
-		return auth_quickaclcheck($ID) > AUTH_DELETE;
+		return auth_quickaclcheck($ID) >= AUTH_DELETE;
 	}
 
 	function handle_approve(&$event, $param) {
