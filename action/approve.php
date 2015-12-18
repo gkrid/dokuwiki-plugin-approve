@@ -114,16 +114,11 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
 			$sum = $m['last_change']['sum'];
 		}
 
-		if ($sum != APPRVOED) {
-			$class = 'approved_no';
-			$last_approved_rev = $this->find_lastest_approved();
-		}
-
-		
 		ptln('<div class="approval '.($sum == APPROVED ? 'approved_yes' : 'approved_no').'">');
 
 		tpl_pageinfo();
 		ptln(' | ');
+		$last_approved_rev = $this->find_lastest_approved();
 		if ($sum == APPROVED) {
 			ptln('<span>'.$this->getLang('approved').'</span>');
 			if ($REV != 0 && auth_quickaclcheck($ID) > AUTH_READ) {
@@ -138,17 +133,19 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
 		} else {
 			ptln('<span>'.$this->getLang('draft').'</span>');
 
-			if (isset($last_approved_rev)) {
+			if ($last_approved_rev == -1) {
+			    if ($REV != 0) {
+				    ptln('<a href="'.wl($ID).'">');
+				    	ptln($this->getLang('newest_draft'));
+				    ptln('</a>');
+				}
+			} else {
 				if ($last_approved_rev != 0)
 					ptln('<a href="'.wl($ID, array('rev' => $last_approved_rev)).'">');
 				else
 					ptln('<a href="'.wl($ID).'">');
 
 					ptln($this->getLang('newest_approved'));
-				ptln('</a>');
-			} else {
-				ptln('<a href="'.wl($ID).'">');
-					ptln($this->getLang('newest_draft'));
 				ptln('</a>');
 			}
 
