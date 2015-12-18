@@ -7,6 +7,7 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
 
     function register(&$controller) {
         $controller->register_hook('ACTION_ACT_PREPROCESS', 'BEFORE', $this, handle_approve, array());
+        $controller->register_hook('ACTION_ACT_PREPROCESS', 'BEFORE', $this, handle_viewer, array());
         $controller->register_hook('TPL_ACT_RENDER', 'AFTER', $this, handle_diff_accept, array());
         $controller->register_hook('TPL_ACT_RENDER', 'BEFORE', $this, handle_display_banner, array());
         $controller->register_hook('HTML_SHOWREV_OUTPUT', 'BEFORE', $this, handle_showrev, array());
@@ -33,8 +34,9 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
 
 	function handle_approve(&$event, $param) {
 		global $ID, $REV, $INFO;
-		if ( ! $this->can_approve()) return;
 		if ($event->data == 'show' && isset($_GET['approve'])) {
+		    if ( ! $this->can_approve()) return;
+		    
 			//change last commit comment to Approved
 			$meta = p_read_metadata($ID);
 			$meta[current][last_change][sum] = $meta[persistent][last_change][sum] = APPROVED;
@@ -61,15 +63,20 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
 			
 			header('Location: ?id='.$ID);
 		}
-
-		/*czytacze wydzą najnowszą zatwierdzaną*/
-		$last = $this->find_lastest_approved();
-		/*użytkownik może tylko czytać i jednocześnie istnieje jakaś zatwierdzona strona*/
-		if (auth_quickaclcheck($ID) <= AUTH_READ && $last != -1)
-			/*najnowsza zatwierdzona nie jest najnowszą*/
-			/*i jednocześnie znajdujemy się w stronach nowszych niż aktualna zatwierdzona*/
-			if ($last != 0 && ($REV > $last || $REV == 0))
-				$REV = $last;
+	}
+    function handle_viewer(&$event, $param) {
+        global $REV, $ID;
+        if ($event->data != 'show') return;
+        if (auth_quickaclcheck($ID) > AUTH_READ) return;
+        
+	    $last = $this->find_lastest_approved();
+	    //no page is approved
+		if ($last == -1) return;
+		//approved page is the newest page
+		if ($last == 0) return;
+		
+		//if we are viewing lastest revision, show last approved
+		if ($REV == 0) header("Location: ?id=$ID&rev=$last");
 	}
 	function find_lastest_approved() {
 		global $ID;
