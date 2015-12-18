@@ -32,18 +32,33 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
 	}
 
 	function handle_approve(&$event, $param) {
-		global $ID, $REV;
+		global $ID, $REV, $INFO;
 		if ( ! $this->can_approve()) return;
 		if ($event->data == 'show' && isset($_GET['approve'])) {
-			//Add or remove the new line from the end of the page. Silly but needed.
-			$content = rawWiki($ID, '');
-			if (substr($content, -1) == "\n") {
-				$content = substr($content, 0, -1);
-			} else {
-				$content .= "\n";
+			//change last commit comment to Approved
+			$meta = p_read_metadata($ID);
+			$meta[current][last_change][sum] = $meta[persistent][last_change][sum] = APPROVED;
+			$meta[current][last_change][user] = $meta[persistent][last_change][user] = $INFO[client];
+			if (!array_key_exists($meta[current][contributor], $INFO[client])) {
+			    $meta[current][contributor][$INFO[client]] = $INFO[userinfo][name];
+			    $meta[persistent][contributor][$INFO[client]] = $INFO[userinfo][name];
 			}
-			saveWikiText($ID, $content, APPROVED);
-
+			p_save_metadata($ID, $meta);
+			//update changelog
+			//remove last line from file
+			$changelog_file = metaFN($ID, '.changes');
+			$changes = file($changelog_file, FILE_SKIP_EMPTY_LINES);
+			$lastLogLine = array_pop($changes);
+			$info = parseChangelogLine($lastLogLine);
+			
+			$info[user] = $INFO[client];
+			$info[sum] = APPROVED;
+			
+			$logline = implode("\t", $info)."\n";
+			array_push($changes, $logline);
+			
+			io_saveFile($changelog_file, implode('', $changes));
+			
 			header('Location: ?id='.$ID);
 		}
 
