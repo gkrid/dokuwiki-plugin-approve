@@ -41,7 +41,7 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
 			$meta = p_read_metadata($ID);
 			$meta[current][last_change][sum] = $meta[persistent][last_change][sum] = APPROVED;
 			$meta[current][last_change][user] = $meta[persistent][last_change][user] = $INFO[client];
-			if (!array_key_exists($meta[current][contributor], $INFO[client])) {
+			if (!array_key_exists($INFO[client], $meta[current][contributor])) {
 			    $meta[current][contributor][$INFO[client]] = $INFO[userinfo][name];
 			    $meta[persistent][contributor][$INFO[client]] = $INFO[userinfo][name];
 			}
