@@ -5,7 +5,7 @@ define(APPROVED, 'Approved');
 
 class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
 
-    function register(&$controller) {
+    function register(Doku_Event_Handler $controller) {
         $controller->register_hook('ACTION_ACT_PREPROCESS', 'BEFORE', $this, handle_approve, array());
         $controller->register_hook('ACTION_ACT_PREPROCESS', 'BEFORE', $this, handle_viewer, array());
         $controller->register_hook('TPL_ACT_RENDER', 'AFTER', $this, handle_diff_accept, array());

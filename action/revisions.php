@@ -4,7 +4,7 @@ if(!defined('DOKU_INC')) die();
 
 class action_plugin_approve_revisions extends DokuWiki_Action_Plugin {
 
-	function register(Doku_Event_Handler &$controller) {
+	function register(Doku_Event_Handler $controller) {
 		$controller->register_hook('HTML_REVISIONSFORM_OUTPUT', 'BEFORE', $this, 'handle_revisions', array());
 		$controller->register_hook('HTML_RECENTFORM_OUTPUT', 'BEFORE', $this, 'handle_revisions', array());
 	}
