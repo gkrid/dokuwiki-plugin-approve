@@ -15,8 +15,10 @@ class helper_plugin_approve extends DokuWiki_Plugin {
         // PHP apparantly does not have closures -
         // so we will parse $valid ourselves. Wasteful.
         $namespace_list = preg_split('/\s+/', $namespace_list);
+       
         //if(count($valid) == 0) { return true; }//whole wiki matches
-        if((count($namespace_list)==1) and ($namespace_list[0]=="")) { return true; }//whole wiki matches
+        if(count($namespace_list) == 1 && $namespace_list[0] == "") { return false; }//whole wiki matches
+
         $id = trim($id, ':');
         $id = explode(':', $id);
 
