@@ -12,11 +12,11 @@ div.approval {
   top:0;
 }
 
-div.approved_yes {
+.approved_yes {
   background-color: #dfd;
 }
 
-div.approved_no {
+.approved_no {
   background-color: #fdd;
 }
 

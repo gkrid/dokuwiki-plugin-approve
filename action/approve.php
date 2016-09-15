@@ -5,7 +5,13 @@ define(APPROVED, 'Approved');
 
 class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
 
-    function register(&$controller) {
+    private $hlp;
+    function __construct(){
+        $this->hlp = plugin_load('helper', 'approve');
+    }
+
+    function register(Doku_Event_Handler $controller) {
+		
         $controller->register_hook('ACTION_ACT_PREPROCESS', 'BEFORE', $this, handle_approve, array());
         $controller->register_hook('ACTION_ACT_PREPROCESS', 'BEFORE', $this, handle_viewer, array());
         $controller->register_hook('TPL_ACT_RENDER', 'AFTER', $this, handle_diff_accept, array());
@@ -14,6 +20,10 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
     }
 	
 	function handle_diff_accept(&$event, $param) {
+		global $ID;
+		
+		if ($this->hlp->in_namespace($this->getConf('no_apr_namespaces'), $ID)) return;
+		
 		if ($event->data == 'diff' && isset($_GET['approve'])) {
 			ptln('<a href="'.DOKU_URL.'doku.php?id='.$_GET['id'].'&approve=approve">'.$this->getLang('approve').'</a>');
 		}
@@ -34,6 +44,9 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
 
 	function handle_approve(&$event, $param) {
 		global $ID, $REV, $INFO;
+		
+		if ($this->hlp->in_namespace($this->getConf('no_apr_namespaces'), $ID)) return;
+		
 		if ($event->data == 'show' && isset($_GET['approve'])) {
 		    if ( ! $this->can_approve()) return;
 		    
@@ -99,8 +112,9 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
 
     function handle_display_banner(&$event, $param) {
 		global $ID, $REV, $INFO;
-
-        if($event->data != 'show') return;
+		
+		if ($this->hlp->in_namespace($this->getConf('no_apr_namespaces'), $ID)) return;
+        if ($event->data != 'show') return;
 		if (!$INFO['exists']) return;
 
 		$m = p_get_metadata($ID);
