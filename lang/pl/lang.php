@@ -9,6 +9,8 @@ $lang['newest_approved'] = 'Najnowsza zatwierdzona';
 
 $lang['hdr_page'] = 'Nazwa strony';
 $lang['hdr_state'] = 'Status';
-$lang['hdr_updated'] = 'Data ostatniej zmiany';
+$lang['hdr_updated'] = 'Data';
 
 $lang['all_approved'] = 'Zatwierdzone';
+
+$lang['by'] = 'przez';

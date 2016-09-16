@@ -109,7 +109,7 @@ class syntax_plugin_approve extends DokuWiki_Syntax_Plugin {
 			}
 			
             $renderer->doc .= '</a></td><td>';
-            $renderer->doc .= $state;
+            $renderer->doc .= '<strong>'.$state. '</strong> '. $this->getLang('by'). ' ' . $page[4];
             $renderer->doc .= '</td><td>';
             $renderer->doc .= $updated;
             $renderer->doc .= '</td></tr>';
@@ -127,6 +127,8 @@ class syntax_plugin_approve extends DokuWiki_Syntax_Plugin {
     }
     
     function _search_helper(&$data, $base, $file, $type, $lvl, $opts) {
+		global $lang;
+		
 		$ns = $opts[0];
         $invalid_ns = $opts[1];
 
@@ -144,14 +146,29 @@ class syntax_plugin_approve extends DokuWiki_Syntax_Plugin {
         }
 
 		$meta = p_get_metadata($id);
+		//var_dump($meta);
 		$date = $meta['date']['modified'];
 		if (isset($meta['last_change']) && $meta['last_change']['sum'] === 'Approved') {
 			$approved = true;
 		} else {
 			$approved = false;
 		}
+
+		if (isset($meta['last_change'])) {
+			$user = $meta['last_change']['user'];
+	
+			if (isset($meta['contributor'][$user])) {
+				$full_name = $meta['contributor'][$user];
+			} else {
+				$full_name = $meta['creator'];
+			}
+		} else {
+			$user = '';
+			$full_name = '('.$lang['external_edit'].')';
+		}
 		
-        $data[] = array($id, $approved, $date);
+		
+        $data[] = array($id, $approved, $date, $user, $full_name);
 
         return false;
 	}
