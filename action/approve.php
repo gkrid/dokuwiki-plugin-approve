@@ -116,17 +116,8 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
 		if ($this->hlp->in_namespace($this->getConf('no_apr_namespaces'), $ID)) return;
         if ($event->data != 'show') return;
 		if (!$INFO['exists']) return;
-
-		$m = p_get_metadata($ID);
-		$changelog = new PageChangeLog($ID);
-
-		//sprawdź status aktualnej strony
-		if ($REV != 0) {
-			$ch = $changelog->getRevisionInfo($REV);
-			$sum = $ch['sum'];
-		} else {
-			$sum = $m['last_change']['sum'];
-		}
+		
+		$sum = $this->hlp->page_sum($ID, $REV);
 
 		ptln('<div class="approval '.($sum == APPROVED ? 'approved_yes' : 'approved_no').'">');
 

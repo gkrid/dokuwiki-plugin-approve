@@ -42,4 +42,18 @@ class helper_plugin_approve extends DokuWiki_Plugin {
         }
         return false;
     }
+    
+    function page_sum($ID, $REV) {
+		$m = p_get_metadata($ID);
+		$changelog = new PageChangeLog($ID);
+
+		//sprawdź status aktualnej strony
+		if ($REV != 0) {
+			$ch = $changelog->getRevisionInfo($REV);
+			$sum = $ch['sum'];
+		} else {
+			$sum = $m['last_change']['sum'];
+		}
+		return $sum;
+	}
 }

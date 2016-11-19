@@ -29,3 +29,6 @@ div.approval a {
 }
 
 
+.approve-print-only {
+    display: none;
+}
