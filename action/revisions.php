@@ -14,7 +14,7 @@ class action_plugin_approve_revisions extends DokuWiki_Action_Plugin {
 		$controller->register_hook('HTML_RECENTFORM_OUTPUT', 'BEFORE', $this, 'handle_revisions', array());
 	}
 
-	function handle_revisions(Doku_Event &$event, $param) {
+	function handle_revisions(Doku_Event $event, $param) {
 		global $ID;
 		global $INFO;
 		

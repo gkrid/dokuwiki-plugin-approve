@@ -19,7 +19,7 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
         $controller->register_hook('HTML_SHOWREV_OUTPUT', 'BEFORE', $this, handle_showrev, array());
     }
 	
-	function handle_diff_accept(&$event, $param) {
+	function handle_diff_accept(Doku_Event $event, $param) {
 		global $ID;
 		
 		if ($this->hlp->in_namespace($this->getConf('no_apr_namespaces'), $ID)) return;
@@ -29,7 +29,7 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
 		}
 	}
 
-	function handle_showrev(&$event, $param) {
+	function handle_showrev(Doku_Event $event, $param) {
 		global $ID, $REV;
 
 		$last = $this->find_lastest_approved();
@@ -42,7 +42,7 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
 		return auth_quickaclcheck($ID) >= AUTH_DELETE;
 	}
 
-	function handle_approve(&$event, $param) {
+	function handle_approve(Doku_Event $event, $param) {
 		global $ID, $REV, $INFO;
 		
 		if ($this->hlp->in_namespace($this->getConf('no_apr_namespaces'), $ID)) return;
@@ -77,7 +77,7 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
 			header('Location: ?id='.$ID);
 		}
 	}
-    function handle_viewer(&$event, $param) {
+    function handle_viewer(Doku_Event $event, $param) {
         global $REV, $ID;
         if ($event->data != 'show') return;
         if (auth_quickaclcheck($ID) > AUTH_READ) return;
@@ -110,7 +110,7 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
 		return -1;
 	}
 
-    function handle_display_banner(&$event, $param) {
+    function handle_display_banner(Doku_Event $event, $param) {
 		global $ID, $REV, $INFO;
 		
 		if ($this->hlp->in_namespace($this->getConf('no_apr_namespaces'), $ID)) return;

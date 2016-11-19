@@ -12,7 +12,7 @@ class action_plugin_approve_prettyprint extends DokuWiki_Action_Plugin {
 	function register(Doku_Event_Handler $controller) {
 		$controller->register_hook('DOKUWIKI_STARTED', 'AFTER',  $this, '_printingInfo');
 	}
-	function _printingInfo($event, $param) {
+	function _printingInfo(Doku_Event $event, $param) {
 		global $JSINFO, $ID, $REV, $INFO;
 		$JSINFO['approve'] = array();
 		
