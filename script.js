@@ -67,6 +67,8 @@ jQuery(function() {
 	} else {
 		cells[0].css('width', '25%');
 		cells[1].css('width', '75%');
+		cells[1].css('text-align', 'left');
+		cells[1].css('padding-left', '50px');
 	}
 	
 
@@ -79,8 +81,6 @@ jQuery(function() {
 			'vertical-align': 'middle'
 		});
 		$tr.append($td);
-		$tr.children().last().css('text-align', 'left');
-		$tr.children().last().css('padding-left', '50px');
 	}
 	
 	$tr.children().first().css('border-left', '0');
