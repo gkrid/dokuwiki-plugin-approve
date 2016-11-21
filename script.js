@@ -67,8 +67,6 @@ jQuery(function() {
 	} else {
 		cells[0].css('width', '25%');
 		cells[1].css('width', '75%');
-		cells[1].css('text-align', 'left');
-		cells[1].css('padding-left', '50px');
 	}
 	
 
