@@ -8,7 +8,7 @@ jQuery(function() {
 
 	var $h1 = jQuery("#dokuwiki__content h1:first");
 	if ($h1.length > 0) {
-		var h1 = $h1.text();
+		var h1 = $h1[0].childNodes[0].nodeValue;
 		$h1.addClass('approve-noprint');
 	} else {
 		//if no header use page title
@@ -34,27 +34,41 @@ jQuery(function() {
 
 	let $print_header = jQuery('<h1>').text(h1);
 	cells.push(jQuery("<td>").append($print_header));
-
-	var lang = JSINFO['approve']['lang'];
 	
 	var status = JSINFO['approve']['status'];
-	var date = JSINFO['approve']['date'];
-	var author = JSINFO['approve']['author'];
+	if (status !== null) {
 
-
-	if (status === 'Approved') {
-		var cont =	lang['approved']+'<br>'+author;
-	} else {
-		var cont =	lang['draft']+'<br>'+author;
-	}
-
-
-	cells.push(jQuery("<td>")
-	.html('<p style="text-align:left">'+
-		cont+'<br>'+
-		date.replace(' ', '&nbsp;')+'<br>'+
+		var lang = JSINFO['approve']['lang'];
 		
-	'</p>'));
+		
+		var date = JSINFO['approve']['date'];
+		var author = JSINFO['approve']['author'];
+
+
+		if (status === 'Approved') {
+			var cont =	lang['approved']+'<br>'+author;
+		} else {
+			var cont =	lang['draft']+'<br>'+author;
+		}
+
+
+		cells.push(jQuery("<td>")
+		.html('<p style="text-align:left">'+
+			cont+'<br>'+
+			date.replace(' ', '&nbsp;')+'<br>'+
+			
+		'</p>'));
+
+		
+		cells[0].css('width', '25%');
+		cells[1].css('width', '50%');
+		cells[2].css('width', '25%');
+
+	} else {
+		cells[0].css('width', '25%');
+		cells[1].css('width', '75%');
+	}
+	
 
 	for (cell in cells) {
 		var $td = cells[cell];
@@ -65,12 +79,10 @@ jQuery(function() {
 			'vertical-align': 'middle'
 		});
 		$tr.append($td);
+		$tr.children().last().css('text-align', 'left');
+		$tr.children().last().css('padding-left', '50px');
 	}
 	
-	cells[0].css('width', '25%');
-	cells[1].css('width', '50%');
-	cells[2].css('width', '25%');
-
 	$tr.children().first().css('border-left', '0');
 	$tr.children().last().css('border-right', '0');
 
