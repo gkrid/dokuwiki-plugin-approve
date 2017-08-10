@@ -1,6 +1,6 @@
 base approve
 author Szymon Olewniczak
-email (my first name) [at] imz.re
+email solewniczak@rid.pl
 date 2016-11-19
 name approve
 desc 
