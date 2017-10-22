@@ -80,7 +80,7 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
     function handle_viewer(Doku_Event $event, $param) {
         global $REV, $ID;
         if ($event->data != 'show') return;
-        if (auth_quickaclcheck($ID) > AUTH_READ) return;
+        if (auth_quickaclcheck($ID) > AUTH_READ || ($this->hlp->in_namespace($this->getConf('no_apr_namespaces'), $ID))) return;
         
 	    $last = $this->find_lastest_approved();
 	    //no page is approved
