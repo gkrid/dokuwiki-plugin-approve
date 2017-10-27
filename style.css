@@ -20,6 +20,10 @@ div.approval {
   background-color: #fdd;
 }
 
+.approved_ready {
+  background-color: #b5d2f9;
+}
+
 div.approval span {
   font-weight: bold;
 }

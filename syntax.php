@@ -62,6 +62,7 @@ class syntax_plugin_approve extends DokuWiki_Syntax_Plugin {
 
 
 		$all_approved = 0;
+        $all_approved_ready = 0;
 		$all = 0;
 		
         $working_ns = null;
@@ -86,11 +87,18 @@ class syntax_plugin_approve extends DokuWiki_Syntax_Plugin {
             $class = 'approved_no';
             $state = $this->getLang('draft');
             $all += 1;
-            if ($page[1] === true) {
+
+            if ($page[1] === 'approved') {
 				$class = 'approved_yes';
 				$state = $this->getLang('approved');
 				$all_approved += 1;
 			}
+
+            if ($page[1] === 'ready for approval') {
+                $class = 'approved_ready';
+                $state = $this->getLang('marked_approve_ready');
+                $all_approved_ready += 1;
+            }
 
             $renderer->doc .= '<tr class="'.$class.'">';
             $renderer->doc .= '<td><a href="';
@@ -114,15 +122,26 @@ class syntax_plugin_approve extends DokuWiki_Syntax_Plugin {
             $renderer->doc .= $updated;
             $renderer->doc .= '</td></tr>';
         }
+
+        $renderer->doc .= '<tr><td><strong>';
+        $renderer->doc .= $this->getLang('all_approved_ready');
+        $renderer->doc .= '</strong></td>';
+        
+        $renderer->doc .= '<td colspan="2">';
+        $renderer->doc .= $all_approved_ready.' / '.$all . sprintf(" (%.0f%%)", $all_approved_ready*100/$all);
+        $renderer->doc .= '</td></tr>';
+        
         $renderer->doc .= '<tr><td><strong>';
         $renderer->doc .= $this->getLang('all_approved');
         $renderer->doc .= '</strong></td>';
         
         $renderer->doc .= '<td colspan="2">';
         $renderer->doc .= $all_approved.' / '.$all . sprintf(" (%.0f%%)", $all_approved*100/$all);
-        $renderer->doc .= '</td>';
-        
-        $renderer->doc .= '</tr></table>';
+        $renderer->doc .= '</td></tr>';
+ 
+
+
+        $renderer->doc .= '</table>';
         return true;
     }
     
@@ -149,10 +168,12 @@ class syntax_plugin_approve extends DokuWiki_Syntax_Plugin {
 		//var_dump($meta);
 		$date = $meta['date']['modified'];
 		if (isset($meta['last_change']) && $meta['last_change']['sum'] === 'Approved') {
-			$approved = true;
+			$approved = 'approved';
+		} elseif (isset($meta['last_change']) && $meta['last_change']['sum'] === 'Ready for approval') {
+			$approved = 'ready for approval';
 		} else {
-			$approved = false;
-		}
+            $approved = 'not approved';
+        }
 
 		if (isset($meta['last_change'])) {
 			$user = $meta['last_change']['user'];
