@@ -29,7 +29,7 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
 			ptln('<a href="'.DOKU_URL.'doku.php?id='.$_GET['id'].'&approve=approve">'.$this->getLang('approve').'</a>');
 		}
 
-		if ($event->data == 'diff' && isset($_GET['ready_for_approval']) && $conf['ready_for_approval']) {
+        if ($event->data == 'diff' && isset($_GET['ready_for_approval']) && $this->getConf('ready_for_approval') === 1) {
 			ptln('<a href="'.DOKU_URL.'doku.php?id='.$_GET['id'].'&ready_for_approval=ready_for_approval">'.$this->getLang('approve_ready').'</a>');
 		}
 	}
@@ -159,7 +159,7 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
 		
 		$sum = $this->hlp->page_sum($ID, $REV);
 
-		ptln('<div class="approval '.($sum == APPROVED ? 'approved_yes' : ($sum == READY_FOR_APPROVAL ? 'approved_ready' :'approved_no')).'">');
+		ptln('<div class="approval '.($sum == APPROVED ? 'approved_yes' : ($sum == READY_FOR_APPROVAL && $this->getConf('ready_for_approval') === 1 ? 'approved_ready' :'approved_no')).'">');
 
 		tpl_pageinfo();
 		ptln(' | ');
@@ -178,7 +178,7 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
 		} else {
 			ptln('<span>'.$this->getLang('draft').'</span>');
 
-			if ($sum == READY_FOR_APPROVAL) {
+			if ($sum == READY_FOR_APPROVAL && $this->getConf('ready_for_approval') === 1) {
 				ptln('<span>| '.$this->getLang('marked_approve_ready').'</span>');
 			}
 
@@ -199,7 +199,7 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
 				ptln('</a>');
 			}
 
-			if ($REV == 0 && $this->can_edit() && $sum != READY_FOR_APPROVAL) {
+			if ($REV == 0 && $this->can_edit() && $sum != READY_FOR_APPROVAL && $this->getConf('ready_for_approval') === 1) {
 				ptln('<a href="'.wl($ID, array('rev' => $last_approved_rev, 'do' => 'diff',
 				'ready_for_approval' => 'ready_for_approval')).'">');
 					ptln($this->getLang('approve_ready'));

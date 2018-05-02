@@ -94,7 +94,7 @@ class syntax_plugin_approve extends DokuWiki_Syntax_Plugin {
 				$all_approved += 1;
 			}
             
-            if ($page[1] === 'ready for approval') {
+            if ($page[1] === 'ready for approval' && $this->getConf('ready_for_approval') === 1) {
                 $class = 'approved_ready';
                 $state = $this->getLang('marked_approve_ready');
                 $all_approved_ready += 1;
@@ -123,7 +123,7 @@ class syntax_plugin_approve extends DokuWiki_Syntax_Plugin {
             $renderer->doc .= '</td></tr>';
         }
 
-        if ($conf['ready_for_approval']) {
+        if ($this->getConf('ready_for_approval') === 1) {
             $renderer->doc .= '<tr><td><strong>';
             $renderer->doc .= $this->getLang('all_approved_ready');
             $renderer->doc .= '</strong></td>';

@@ -4,7 +4,6 @@ $lang['approve'] = 'Approve';
 $lang['approved'] = 'Approved';
 $lang['approve_ready'] = 'Mark ready for approval';
 $lang['marked_approve_ready'] = 'Ready for approval';
-$lang['ready_for_approval'] = 'Enable intermediate state "mark ready for approval" to let a reviewer know the page can be checked/approved';
 
 $lang['draft'] = 'Draft';
 $lang['last_approved'] = 'Last approved';
