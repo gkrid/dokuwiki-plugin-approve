@@ -21,7 +21,6 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
         $controller->register_hook('HTML_SHOWREV_OUTPUT', 'BEFORE', $this, handle_showrev, array());
         // ensure a page revision is created when summary changes:
         $controller->register_hook('COMMON_WIKIPAGE_SAVE', 'BEFORE', $this, 'handle_pagesave_before');
-        $controller->register_hook('PARSER_METADATA_RENDER', 'AFTER', $this, 'handle_parser_metadata_render');
     }
 	
 	function handle_diff_accept(Doku_Event $event, $param) {
@@ -110,9 +109,13 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
 		$last_approved_rev = $this->find_lastest_approved();
 		if ($sum == APPROVED) {
 		    $version = p_get_metadata($ID, METADATA_VERSION_KEY);
+		    if (!$version) {
+		        $version = $this->calculateVersion($ID);
+		        p_set_metadata($ID, array(METADATA_VERSION_KEY => $version));
+            }
 
-			ptln('<span>'.$this->getLang('approved').' (' . $this->getLang('version') .  ': ' . $version
-                 . ')</span>');
+			ptln('<span>'.$this->getLang('approved').'</span> (' . $this->getLang('version') .  ': ' . $version
+                 . ')');
 			if ($REV != 0 && auth_quickaclcheck($ID) > AUTH_READ) {
 				ptln('<a href="'.wl($ID).'">');
 				ptln($this->getLang(p_get_metadata($ID, 'last_change sum') == APPROVED ? 'newest_approved' : 'newest_draft'));
@@ -179,26 +182,6 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
 
             p_set_metadata($id, array(METADATA_VERSION_KEY => $version));
         }
-    }
-
-    /**
-     * Check if the page has to be changed
-     *
-     * @param Doku_Event $event  event object by reference
-     * @param mixed      $param  [the parameters passed as fifth argument to register_hook() when this
-     *                           handler was registered]
-     * @return void
-     */
-    public function handle_parser_metadata_render(Doku_Event $event, $param) {
-        global $ID;
-        $id = $ID;
-        if ($this->hlp->in_namespace($this->getConf('no_apr_namespaces'), $id)) return;
-
-        if (!isset($event->data['persistent'][METADATA_VERSION_KEY])) {
-            $event->data['persistent'][METADATA_VERSION_KEY] = $this->calculateVersion($id);
-        }
-
-
     }
 
     /**
