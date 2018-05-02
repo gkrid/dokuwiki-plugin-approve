@@ -29,7 +29,7 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
 			ptln('<a href="'.DOKU_URL.'doku.php?id='.$_GET['id'].'&approve=approve">'.$this->getLang('approve').'</a>');
 		}
 
-		if ($event->data == 'diff' && isset($_GET['ready_for_approval'])) {
+		if ($event->data == 'diff' && isset($_GET['ready_for_approval']) && $conf['ready_for_approval']) {
 			ptln('<a href="'.DOKU_URL.'doku.php?id='.$_GET['id'].'&ready_for_approval=ready_for_approval">'.$this->getLang('approve_ready').'</a>');
 		}
 	}

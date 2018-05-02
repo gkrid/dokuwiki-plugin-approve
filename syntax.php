@@ -93,7 +93,7 @@ class syntax_plugin_approve extends DokuWiki_Syntax_Plugin {
 				$state = $this->getLang('approved');
 				$all_approved += 1;
 			}
-
+            
             if ($page[1] === 'ready for approval') {
                 $class = 'approved_ready';
                 $state = $this->getLang('marked_approve_ready');
@@ -123,13 +123,15 @@ class syntax_plugin_approve extends DokuWiki_Syntax_Plugin {
             $renderer->doc .= '</td></tr>';
         }
 
-        $renderer->doc .= '<tr><td><strong>';
-        $renderer->doc .= $this->getLang('all_approved_ready');
-        $renderer->doc .= '</strong></td>';
-        
-        $renderer->doc .= '<td colspan="2">';
-        $renderer->doc .= $all_approved_ready.' / '.$all . sprintf(" (%.0f%%)", $all_approved_ready*100/$all);
-        $renderer->doc .= '</td></tr>';
+        if ($conf['ready_for_approval']) {
+            $renderer->doc .= '<tr><td><strong>';
+            $renderer->doc .= $this->getLang('all_approved_ready');
+            $renderer->doc .= '</strong></td>';
+            
+            $renderer->doc .= '<td colspan="2">';
+            $renderer->doc .= $all_approved_ready.' / '.$all . sprintf(" (%.0f%%)", $all_approved_ready*100/$all);
+            $renderer->doc .= '</td></tr>';
+        }
         
         $renderer->doc .= '<tr><td><strong>';
         $renderer->doc .= $this->getLang('all_approved');
