@@ -3,6 +3,8 @@
 if(!defined('DOKU_INC')) die();
 define(APPROVED, 'Approved');
 
+define(METADATA_VERSION_KEY, 'plugin_approve_version');
+
 class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
 
     private $hlp;
@@ -17,6 +19,9 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
         $controller->register_hook('TPL_ACT_RENDER', 'AFTER', $this, handle_diff_accept, array());
         $controller->register_hook('TPL_ACT_RENDER', 'BEFORE', $this, handle_display_banner, array());
         $controller->register_hook('HTML_SHOWREV_OUTPUT', 'BEFORE', $this, handle_showrev, array());
+        // ensure a page revision is created when summary changes:
+        $controller->register_hook('COMMON_WIKIPAGE_SAVE', 'BEFORE', $this, 'handle_pagesave_before');
+        $controller->register_hook('PARSER_METADATA_RENDER', 'AFTER', $this, 'handle_parser_metadata_render');
     }
 	
 	function handle_diff_accept(Doku_Event $event, $param) {
@@ -49,31 +54,10 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
 		
 		if ($event->data == 'show' && isset($_GET['approve'])) {
 		    if ( ! $this->can_approve()) return;
-		    
-			//change last commit comment to Approved
-			$meta = p_read_metadata($ID);
-			$meta[current][last_change][sum] = $meta[persistent][last_change][sum] = APPROVED;
-			$meta[current][last_change][user] = $meta[persistent][last_change][user] = $INFO[client];
-			if (!array_key_exists($INFO[client], $meta[current][contributor])) {
-			    $meta[current][contributor][$INFO[client]] = $INFO[userinfo][name];
-			    $meta[persistent][contributor][$INFO[client]] = $INFO[userinfo][name];
-			}
-			p_save_metadata($ID, $meta);
-			//update changelog
-			//remove last line from file
-			$changelog_file = metaFN($ID, '.changes');
-			$changes = file($changelog_file, FILE_SKIP_EMPTY_LINES);
-			$lastLogLine = array_pop($changes);
-			$info = parseChangelogLine($lastLogLine);
-			
-			$info[user] = $INFO[client];
-			$info[sum] = APPROVED;
-			
-			$logline = implode("\t", $info)."\n";
-			array_push($changes, $logline);
-			
-			io_saveFile($changelog_file, implode('', $changes));
-			
+
+		    //create new page revison
+            saveWikiText($ID, rawWiki($ID), APPROVED);
+
 			header('Location: ?id='.$ID);
 		}
 	}
@@ -125,10 +109,13 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
 		ptln(' | ');
 		$last_approved_rev = $this->find_lastest_approved();
 		if ($sum == APPROVED) {
-			ptln('<span>'.$this->getLang('approved').'</span>');
+		    $version = p_get_metadata($ID, METADATA_VERSION_KEY);
+
+			ptln('<span>'.$this->getLang('approved').' (' . $this->getLang('version') .  ': ' . $version
+                 . ')</span>');
 			if ($REV != 0 && auth_quickaclcheck($ID) > AUTH_READ) {
 				ptln('<a href="'.wl($ID).'">');
-				ptln($this->getLang($m['last_change']['sum'] == APPROVED ? 'newest_approved' : 'newest_draft'));
+				ptln($this->getLang(p_get_metadata($ID, 'last_change sum') == APPROVED ? 'newest_approved' : 'newest_draft'));
 				ptln('</a>');
 			} else if ($REV != 0 && $REV != $last_approved_rev) {
 				ptln('<a href="'.wl($ID).'">');
@@ -164,5 +151,79 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
 		}
 		ptln('</div>');
 	}
+
+    /**
+     * Check if the page has to be changed
+     *
+     * @param Doku_Event $event  event object by reference
+     * @param mixed      $param  [the parameters passed as fifth argument to register_hook() when this
+     *                           handler was registered]
+     * @return void
+     */
+    public function handle_pagesave_before(Doku_Event $event, $param) {
+        $id = $event->data['id'];
+        if ($this->hlp->in_namespace($this->getConf('no_apr_namespaces'), $id)) return;
+
+        //save page if summary is provided
+        if($event->data['summary'] == APPROVED) {
+            $event->data['contentChanged'] = true;
+
+            $version = p_get_metadata($id, METADATA_VERSION_KEY);
+
+            //calculate current version
+            if (!$version) {
+                $version = $this->calculateVersion($id);
+            } else {
+                $version += 1;
+            }
+
+            p_set_metadata($id, array(METADATA_VERSION_KEY => $version));
+        }
+    }
+
+    /**
+     * Check if the page has to be changed
+     *
+     * @param Doku_Event $event  event object by reference
+     * @param mixed      $param  [the parameters passed as fifth argument to register_hook() when this
+     *                           handler was registered]
+     * @return void
+     */
+    public function handle_parser_metadata_render(Doku_Event $event, $param) {
+        global $ID;
+        $id = $ID;
+        if ($this->hlp->in_namespace($this->getConf('no_apr_namespaces'), $id)) return;
+
+        if (!isset($event->data['persistent'][METADATA_VERSION_KEY])) {
+            $event->data['persistent'][METADATA_VERSION_KEY] = $this->calculateVersion($id);
+        }
+
+
+    }
+
+    /**
+     * Calculate current version
+     *
+     * @param $id
+     * @return int
+     */
+    protected function calculateVersion($id) {
+        $version = 1;
+
+        $changelog = new PageChangeLog($id);
+        $first = 0;
+        $num = 100;
+        while (count($revs = $changelog->getRevisions($first, $num)) > 0) {
+            foreach ($revs as $rev) {
+                $revInfo = $changelog->getRevisionInfo($rev);
+                if ($revInfo['sum'] == APPROVED) {
+                    $version += 1;
+                }
+            }
+            $first += $num;
+        }
+
+        return $version;
+    }
 
 }

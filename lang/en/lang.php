@@ -14,3 +14,5 @@ $lang['hdr_updated'] = 'Updated';
 $lang['all_approved'] = 'Approved';
 
 $lang['by'] = 'by';
+
+$lang['version'] = 'version';
