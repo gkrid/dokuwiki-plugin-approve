@@ -17,3 +17,5 @@ $lang['all_approved'] = 'Zatwierdzone';
 $lang['all_approved_ready'] = 'Ready for approval';
 
 $lang['by'] = 'przez';
+
+$lang['version'] = 'wersja';

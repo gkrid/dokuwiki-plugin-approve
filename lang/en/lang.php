@@ -18,3 +18,5 @@ $lang['all_approved'] = 'Approved';
 $lang['all_approved_ready'] = 'Ready for approval';
 
 $lang['by'] = 'by';
+
+$lang['version'] = 'version';
