@@ -20,13 +20,21 @@ class action_plugin_approve_prettyprint extends DokuWiki_Action_Plugin {
 			'approved' => $this->getLang('approved'),
 			'draft' => $this->getLang('draft'),
 			'by' => $this->getLang('by'),
-			'date' => $this->getLang('hdr_updated')
+			'date' => $this->getLang('hdr_updated'),
+            'version' => $this->getLang('version')
 		);
 		
-		if ($this->getConf('prettyprint') === 1) {
+		if ($this->getConf('prettyprint')) {
 			$JSINFO['approve']['prettyprint'] = true;
-			
+
+			$versions = p_get_metadata($ID, 'plugin_approve_versions');
+			if (empty($REV)) {
+			    $version = $versions[0];
+            } else {
+			    $version = $versions[$REV];
+            }
 			$JSINFO['approve']['status'] = $this->hlp->page_sum($ID, $REV);
+			$JSINFO['approve']['version'] = $version;
 			$JSINFO['approve']['date'] = dformat($INFO['lastmod']);
 			$JSINFO['approve']['author'] = editorinfo($INFO['editor']);
 		} else {

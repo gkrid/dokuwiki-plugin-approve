@@ -83,11 +83,11 @@ class syntax_plugin_approve extends DokuWiki_Syntax_Plugin {
 
             $updated = '<a href="' . wl($page[0]) . '">' . dformat($page[2]) . '</a>';
             
-            $class = 'approved_no';
+            $class = 'plugin__approve_red';
             $state = $this->getLang('draft');
             $all += 1;
             if ($page[1] === true) {
-				$class = 'approved_yes';
+				$class = 'plugin__approve_green';
 				$state = $this->getLang('approved');
 				$all_approved += 1;
 			}

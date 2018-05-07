@@ -4,20 +4,19 @@ jQuery(function() {
 	}
 	
 	//hide in print
-	jQuery('#dokuwiki__header').addClass('approve-noprint');
+	jQuery('#dokuwiki__header').addClass('plugin__approve_noprint');
 
 	var $h1 = jQuery("#dokuwiki__content h1:first");
 	if ($h1.length > 0) {
 		var h1 = $h1[0].childNodes[0].nodeValue;
-		$h1.addClass('approve-noprint');
+		$h1.addClass('plugin__approve_noprint');
 	} else {
 		//if no header use page title
 		var h1 = jQuery("#dokuwiki__header h1:first span").text();
 	}
 	
 	var $img = jQuery("#dokuwiki__header img").clone();
-	var $table = jQuery("<table>")
-					.addClass("approve-print-only")
+	var $table = jQuery('<table id="plugin__approve_printheader">')
 					.css({
 						'table-layout': 'fixed',
 						'border-collapse': 'collapse',
@@ -32,23 +31,24 @@ jQuery(function() {
 
 	cells.push(jQuery("<td>").append($img));
 
-	let $print_header = jQuery('<h1>').text(h1);
+	var $print_header = jQuery('<h1>').text(h1);
 	cells.push(jQuery("<td>").append($print_header));
 	
 	var status = JSINFO['approve']['status'];
-	if (status !== null) {
+	if (status) {
 
 		var lang = JSINFO['approve']['lang'];
 		
 		
 		var date = JSINFO['approve']['date'];
 		var author = JSINFO['approve']['author'];
+		var version = JSINFO['approve']['version'];
 
 
 		if (status === 'Approved') {
-			var cont =	lang['approved']+'<br>'+author;
+			var cont =	lang['approved'] + ' (' + lang['version'] + ': ' + version + ')<br>' + author;
 		} else {
-			var cont =	lang['draft']+'<br>'+author;
+			var cont =	lang['draft'] + '<br>' + author;
 		}
 
 

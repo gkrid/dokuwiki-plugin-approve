@@ -1,15 +1,7 @@
-div.approval {
-	display: none;
+.plugin__approve_noprint {
+    display: none;
 }
 
-table.approve-print-only {
+#plugin__approve_printheader {
     display: table;
-}
-
-.approve-noprint {
-	display: none;
-}
-
-#dokuwiki__content .page {
-	min-height: 0 !important;
 }
