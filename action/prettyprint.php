@@ -2,16 +2,12 @@
 
 if(!defined('DOKU_INC')) die();
 
-class action_plugin_approve_prettyprint extends DokuWiki_Action_Plugin {
-	
-    private $hlp;
-    function __construct(){
-        $this->hlp = plugin_load('helper', 'approve');
-    }
-    
+class action_plugin_approve_prettyprint extends action_plugin_approve {
+
 	function register(Doku_Event_Handler $controller) {
 		$controller->register_hook('DOKUWIKI_STARTED', 'AFTER',  $this, '_printingInfo');
 	}
+
 	function _printingInfo(Doku_Event $event, $param) {
 		global $JSINFO, $ID, $REV, $INFO;
 		$JSINFO['approve'] = array();
@@ -27,7 +23,7 @@ class action_plugin_approve_prettyprint extends DokuWiki_Action_Plugin {
 		if ($this->getConf('prettyprint')) {
 			$JSINFO['approve']['prettyprint'] = true;
 
-			$versions = p_get_metadata($ID, 'plugin_approve_versions');
+			$versions = p_get_metadata($ID, self::METADATA_VERSIONS_KEY);
 			if (empty($REV)) {
 			    $version = $versions[0];
             } else {

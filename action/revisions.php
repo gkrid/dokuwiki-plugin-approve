@@ -2,13 +2,8 @@
 
 if(!defined('DOKU_INC')) die();
 
-class action_plugin_approve_revisions extends DokuWiki_Action_Plugin {
+class action_plugin_approve_revisions extends action_plugin_approve {
 	
-    private $hlp;
-    function __construct(){
-        $this->hlp = plugin_load('helper', 'approve');
-    }
-    
 	function register(Doku_Event_Handler $controller) {
 		$controller->register_hook('HTML_REVISIONSFORM_OUTPUT', 'BEFORE', $this, 'handle_revisions', array());
 		$controller->register_hook('HTML_RECENTFORM_OUTPUT', 'BEFORE', $this, 'handle_revisions', array());
@@ -24,7 +19,7 @@ class action_plugin_approve_revisions extends DokuWiki_Action_Plugin {
 
 			if (is_array($ref) && isset($ref['_elem']) && $ref['_elem'] == 'opentag' && $ref['_tag'] == 'div' && $ref['class'] == 'li') {
 			    $member = $key;
-            } elseif (is_string($ref) && strstr($ref, 'Approved')) {
+            } elseif (is_string($ref) && strstr($ref, self::APPROVED)) {
                 $event->data->_content[$member]['class'] .= ' plugin__approve_green';
             }
 

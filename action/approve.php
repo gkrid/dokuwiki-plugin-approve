@@ -1,16 +1,8 @@
 <?php
 
 if(!defined('DOKU_INC')) die();
-define(APPROVED, 'Approved');
 
-define(METADATA_VERSIONS_KEY, 'plugin_approve_versions');
-
-class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
-
-    private $hlp;
-    function __construct(){
-        $this->hlp = plugin_load('helper', 'approve');
-    }
+class action_plugin_approve_approve extends action_plugin_approve {
 
     function register(Doku_Event_Handler $controller) {
 		
@@ -56,7 +48,7 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
 		    if ( ! $this->can_approve()) return;
 
 		    //create new page revison
-            saveWikiText($ID, rawWiki($ID), APPROVED);
+            saveWikiText($ID, rawWiki($ID), self::APPROVED);
 
 			header('Location: ?id='.$ID);
 		}
@@ -81,7 +73,7 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
 		global $ID;
 		$m = p_get_metadata($ID);
 		$sum = $m['last_change']['sum'];
-		if ($sum == APPROVED)
+		if ($sum == self::APPROVED)
 			return 0;
 
 		$changelog = new PageChangeLog($ID);
@@ -90,7 +82,7 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
 		$chs = $changelog->getRevisions(0, 10000);
 		foreach ($chs as $rev) {
 			$ch = $changelog->getRevisionInfo($rev);
-			if ($ch['sum'] == APPROVED)
+			if ($ch['sum'] == self::APPROVED)
 				return $rev;
 		}
 		return -1;
@@ -111,7 +103,7 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
 		    $classes[] = 'plugin__approve_noprint';
         }
 
-        if ($sum == APPROVED) {
+        if ($sum == self::APPROVED) {
 		    $classes[] = 'plugin__approve_green';
         } else {
             $classes[] = 'plugin__approve_red';
@@ -122,8 +114,8 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
 		tpl_pageinfo();
 		ptln(' | ');
 		$last_approved_rev = $this->find_lastest_approved();
-		if ($sum == APPROVED) {
-		    $versions = p_get_metadata($ID, METADATA_VERSIONS_KEY);
+		if ($sum == self::APPROVED) {
+		    $versions = p_get_metadata($ID, self::METADATA_VERSIONS_KEY);
 		    if (!$versions) {
                 $versions = $this->render_metadata_for_approved_page($ID);
             }
@@ -137,7 +129,7 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
                  . ')');
 			if ($REV != 0 && auth_quickaclcheck($ID) > AUTH_READ) {
 				ptln('<a href="'.wl($ID).'">');
-				ptln($this->getLang(p_get_metadata($ID, 'last_change sum') == APPROVED ? 'newest_approved' : 'newest_draft'));
+				ptln($this->getLang(p_get_metadata($ID, 'last_change sum') == self::APPROVED ? 'newest_approved' : 'newest_draft'));
 				ptln('</a>');
 			} else if ($REV != 0 && $REV != $last_approved_rev) {
 				ptln('<a href="'.wl($ID).'">');
@@ -188,7 +180,7 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
         if ($this->hlp->in_namespace($this->getConf('no_apr_namespaces'), $id)) return;
 
         //save page if summary is provided
-        if($event->data['summary'] == APPROVED) {
+        if($event->data['summary'] == self::APPROVED) {
             $event->data['contentChanged'] = true;
         }
     }
@@ -203,9 +195,9 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
         if ($this->hlp->in_namespace($this->getConf('no_apr_namespaces'), $id)) return;
 
         //save page if summary is provided
-        if($event->data['summary'] == APPROVED) {
+        if($event->data['summary'] == self::APPROVED) {
 
-            $versions = p_get_metadata($id, METADATA_VERSIONS_KEY);
+            $versions = p_get_metadata($id, self::METADATA_VERSIONS_KEY);
             //calculate versions
             if (!$versions) {
                 $this->render_metadata_for_approved_page($id, $event->data['newRevision']);
@@ -213,7 +205,7 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
                 $curver = $versions[0] + 1;
                 $versions[0] = $curver;
                 $versions[$event->data['newRevision']] = $curver;
-                p_set_metadata($id, array(METADATA_VERSIONS_KEY => $versions));
+                p_set_metadata($id, array(self::METADATA_VERSIONS_KEY => $versions));
             }
         }
     }
@@ -239,7 +231,7 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
         while (count($revs = $changelog->getRevisions($first, $num)) > 0) {
             foreach ($revs as $rev) {
                 $revInfo = $changelog->getRevisionInfo($rev);
-                if ($revInfo['sum'] == APPROVED) {
+                if ($revInfo['sum'] == self::APPROVED) {
                     $versions[$rev] = $version;
                     $version -= 1;
                 }
@@ -247,7 +239,7 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
             $first += $num;
         }
 
-        p_set_metadata($id, array(METADATA_VERSIONS_KEY => $versions));
+        p_set_metadata($id, array(self::METADATA_VERSIONS_KEY => $versions));
 
         return $versions;
     }
@@ -266,7 +258,7 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
         while (count($revs = $changelog->getRevisions($first, $num)) > 0) {
             foreach ($revs as $rev) {
                 $revInfo = $changelog->getRevisionInfo($rev);
-                if ($revInfo['sum'] == APPROVED) {
+                if ($revInfo['sum'] == self::APPROVED) {
                     $count += 1;
                 }
             }
