@@ -1,4 +1,7 @@
 <?php
+
+use dokuwiki\plugin\approve\meta\ApproveConst;
+
 // must be run within DokuWiki
 if(!defined('DOKU_INC')) die();
 
@@ -62,6 +65,7 @@ class syntax_plugin_approve extends DokuWiki_Syntax_Plugin {
 
 
 		$all_approved = 0;
+        $all_approved_ready = 0;
 		$all = 0;
 		
         $working_ns = null;
@@ -86,11 +90,16 @@ class syntax_plugin_approve extends DokuWiki_Syntax_Plugin {
             $class = 'plugin__approve_red';
             $state = $this->getLang('draft');
             $all += 1;
-            if ($page[1] === true) {
+
+            if ($page[1] === 'approved') {
 				$class = 'plugin__approve_green';
 				$state = $this->getLang('approved');
 				$all_approved += 1;
-			}
+			} elseif ($page[1] === 'ready for approval' && $this->getConf('ready_for_approval') === 1) {
+                $class = 'plugin__approve_ready';
+                $state = $this->getLang('marked_approve_ready');
+                $all_approved_ready += 1;
+            }
 
             $renderer->doc .= '<tr class="'.$class.'">';
             $renderer->doc .= '<td><a href="';
@@ -114,15 +123,28 @@ class syntax_plugin_approve extends DokuWiki_Syntax_Plugin {
             $renderer->doc .= $updated;
             $renderer->doc .= '</td></tr>';
         }
+
+        if ($this->getConf('ready_for_approval') === 1) {
+            $renderer->doc .= '<tr><td><strong>';
+            $renderer->doc .= $this->getLang('all_approved_ready');
+            $renderer->doc .= '</strong></td>';
+            
+            $renderer->doc .= '<td colspan="2">';
+            $renderer->doc .= $all_approved_ready.' / '.$all . sprintf(" (%.0f%%)", $all_approved_ready*100/$all);
+            $renderer->doc .= '</td></tr>';
+        }
+        
         $renderer->doc .= '<tr><td><strong>';
         $renderer->doc .= $this->getLang('all_approved');
         $renderer->doc .= '</strong></td>';
         
         $renderer->doc .= '<td colspan="2">';
         $renderer->doc .= $all_approved.' / '.$all . sprintf(" (%.0f%%)", $all_approved*100/$all);
-        $renderer->doc .= '</td>';
-        
-        $renderer->doc .= '</tr></table>';
+        $renderer->doc .= '</td></tr>';
+ 
+
+
+        $renderer->doc .= '</table>';
         return true;
     }
     
@@ -148,11 +170,13 @@ class syntax_plugin_approve extends DokuWiki_Syntax_Plugin {
 		$meta = p_get_metadata($id);
 		//var_dump($meta);
 		$date = $meta['date']['modified'];
-		if (isset($meta['last_change']) && $meta['last_change']['sum'] === 'Approved') {
-			$approved = true;
+		if (isset($meta['last_change']) && $meta['last_change']['sum'] === ApproveConst::APPROVED) {
+			$approved = 'approved';
+		} elseif (isset($meta['last_change']) && $meta['last_change']['sum'] === ApproveConst::READY_FOR_APPROVAL) {
+			$approved = 'ready for approval';
 		} else {
-			$approved = false;
-		}
+            $approved = 'not approved';
+        }
 
 		if (isset($meta['last_change'])) {
 			$user = $meta['last_change']['user'];
