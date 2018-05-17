@@ -1,8 +1,17 @@
 <?php
 
+use dokuwiki\plugin\approve\meta\ApproveConst;
+
 if(!defined('DOKU_INC')) die();
 
-class action_plugin_approve_prettyprint extends action_plugin_approve {
+class action_plugin_approve_prettyprint extends DokuWiki_Action_Plugin {
+
+    /** @var DokuWiki_PluginInterface */
+    protected $hlp;
+
+    function __construct(){
+        $this->hlp = plugin_load('helper', 'approve');
+    }
 
 	function register(Doku_Event_Handler $controller) {
 		$controller->register_hook('DOKUWIKI_STARTED', 'AFTER',  $this, '_printingInfo');
@@ -23,7 +32,7 @@ class action_plugin_approve_prettyprint extends action_plugin_approve {
 		if ($this->getConf('prettyprint')) {
 			$JSINFO['approve']['prettyprint'] = true;
 
-			$versions = p_get_metadata($ID, self::METADATA_VERSIONS_KEY);
+			$versions = p_get_metadata($ID, ApproveConst::METADATA_VERSIONS_KEY);
 			if (empty($REV)) {
 			    $version = $versions[0];
             } else {

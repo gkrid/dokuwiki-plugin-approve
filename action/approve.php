@@ -1,8 +1,17 @@
 <?php
 
+use dokuwiki\plugin\approve\meta\ApproveConst;
+
 if(!defined('DOKU_INC')) die();
 
-class action_plugin_approve_approve extends action_plugin_approve {
+class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
+
+    /** @var DokuWiki_PluginInterface */
+    protected $hlp;
+
+    function __construct(){
+        $this->hlp = plugin_load('helper', 'approve');
+    }
 
     function register(Doku_Event_Handler $controller) {
 		
@@ -24,6 +33,10 @@ class action_plugin_approve_approve extends action_plugin_approve {
 		if ($event->data == 'diff' && isset($_GET['approve'])) {
 			ptln('<a href="'.DOKU_URL.'doku.php?id='.$_GET['id'].'&approve=approve">'.$this->getLang('approve').'</a>');
 		}
+
+        if ($event->data == 'diff' && isset($_GET['ready_for_approval']) && $this->getConf('ready_for_approval') === 1) {
+			ptln('<a href="'.DOKU_URL.'doku.php?id='.$_GET['id'].'&ready_for_approval=ready_for_approval">'.$this->getLang('approve_ready').'</a>');
+		}
 	}
 
 	function handle_showrev(Doku_Event $event, $param) {
@@ -39,6 +52,11 @@ class action_plugin_approve_approve extends action_plugin_approve {
 		return auth_quickaclcheck($ID) >= AUTH_DELETE;
 	}
 
+    function can_edit() {
+		global $ID;
+		return auth_quickaclcheck($ID) >= AUTH_EDIT;
+	}
+
 	function handle_approve(Doku_Event $event, $param) {
 		global $ID;
 		
@@ -48,10 +66,17 @@ class action_plugin_approve_approve extends action_plugin_approve {
 		    if ( ! $this->can_approve()) return;
 
 		    //create new page revison
-            saveWikiText($ID, rawWiki($ID), self::APPROVED);
+            saveWikiText($ID, rawWiki($ID), ApproveConst::APPROVED);
 
 			header('Location: ?id='.$ID);
-		}
+		} elseif ($event->data == 'show' && isset($_GET['ready_for_approval'])) {
+		    if ( ! $this->can_edit()) return;
+
+            //create new page revison
+            saveWikiText($ID, rawWiki($ID), ApproveConst::READY_FOR_APPROVAL);
+
+            header('Location: ?id='.$ID);
+		}		
 	}
 
     function handle_viewer(Doku_Event $event, $param) {
@@ -73,16 +98,15 @@ class action_plugin_approve_approve extends action_plugin_approve {
 		global $ID;
 		$m = p_get_metadata($ID);
 		$sum = $m['last_change']['sum'];
-		if ($sum == self::APPROVED)
+		if ($sum == ApproveConst::APPROVED)
 			return 0;
 
 		$changelog = new PageChangeLog($ID);
-		//wyszukaj najnowszej zatwierdzonej
-		//poszukaj w dół
+
 		$chs = $changelog->getRevisions(0, 10000);
 		foreach ($chs as $rev) {
 			$ch = $changelog->getRevisionInfo($rev);
-			if ($ch['sum'] == self::APPROVED)
+			if ($ch['sum'] == ApproveConst::APPROVED)
 				return $rev;
 		}
 		return -1;
@@ -103,8 +127,10 @@ class action_plugin_approve_approve extends action_plugin_approve {
 		    $classes[] = 'plugin__approve_noprint';
         }
 
-        if ($sum == self::APPROVED) {
+        if ($sum == ApproveConst::APPROVED) {
 		    $classes[] = 'plugin__approve_green';
+		} elseif ($sum == ApproveConst::READY_FOR_APPROVAL && $this->getConf('ready_for_approval')) {
+		    $classes[] = 'plugin__approve_ready';
         } else {
             $classes[] = 'plugin__approve_red';
         }
@@ -114,8 +140,8 @@ class action_plugin_approve_approve extends action_plugin_approve {
 		tpl_pageinfo();
 		ptln(' | ');
 		$last_approved_rev = $this->find_lastest_approved();
-		if ($sum == self::APPROVED) {
-		    $versions = p_get_metadata($ID, self::METADATA_VERSIONS_KEY);
+		if ($sum == ApproveConst::APPROVED) {
+		    $versions = p_get_metadata($ID, ApproveConst::METADATA_VERSIONS_KEY);
 		    if (!$versions) {
                 $versions = $this->render_metadata_for_approved_page($ID);
             }
@@ -129,7 +155,7 @@ class action_plugin_approve_approve extends action_plugin_approve {
                  . ')');
 			if ($REV != 0 && auth_quickaclcheck($ID) > AUTH_READ) {
 				ptln('<a href="'.wl($ID).'">');
-				ptln($this->getLang(p_get_metadata($ID, 'last_change sum') == self::APPROVED ? 'newest_approved' : 'newest_draft'));
+				ptln($this->getLang(p_get_metadata($ID, 'last_change sum') == ApproveConst::APPROVED ? 'newest_approved' : 'newest_draft'));
 				ptln('</a>');
 			} else if ($REV != 0 && $REV != $last_approved_rev) {
 				ptln('<a href="'.wl($ID).'">');
@@ -138,6 +164,11 @@ class action_plugin_approve_approve extends action_plugin_approve {
 			}
 		} else {
 			ptln('<span>'.$this->getLang('draft').'</span>');
+
+			if ($sum == ApproveConst::READY_FOR_APPROVAL && $this->getConf('ready_for_approval') === 1) {
+				ptln('<span>| '.$this->getLang('marked_approve_ready').'</span>');
+			}
+
 
 			if ($last_approved_rev == -1) {
 			    if ($REV != 0) {
@@ -155,13 +186,21 @@ class action_plugin_approve_approve extends action_plugin_approve {
 				ptln('</a>');
 			}
 
-			//można zatwierdzać tylko najnowsze strony
+			if ($REV == 0 && $this->can_edit() && $sum != ApproveConst::READY_FOR_APPROVAL && $this->getConf('ready_for_approval') === 1) {
+				ptln(' | <a href="'.wl($ID, array('rev' => $last_approved_rev, 'do' => 'diff',
+				'ready_for_approval' => 'ready_for_approval')).'">');
+					ptln($this->getLang('approve_ready'));
+				ptln('</a>');
+			}
+
 			if ($REV == 0 && $this->can_approve()) {
-				ptln('<a href="'.wl($ID, array('rev' => $last_approved_rev, 'do' => 'diff',
+				ptln(' | <a href="'.wl($ID, array('rev' => $last_approved_rev, 'do' => 'diff',
 				'approve' => 'approve')).'">');
 					ptln($this->getLang('approve'));
 				ptln('</a>');
 			}
+
+
 		}
 		ptln('</div>');
 	}
@@ -180,7 +219,7 @@ class action_plugin_approve_approve extends action_plugin_approve {
         if ($this->hlp->in_namespace($this->getConf('no_apr_namespaces'), $id)) return;
 
         //save page if summary is provided
-        if($event->data['summary'] == self::APPROVED) {
+        if($event->data['summary'] == ApproveConst::APPROVED) {
             $event->data['contentChanged'] = true;
         }
     }
@@ -195,9 +234,9 @@ class action_plugin_approve_approve extends action_plugin_approve {
         if ($this->hlp->in_namespace($this->getConf('no_apr_namespaces'), $id)) return;
 
         //save page if summary is provided
-        if($event->data['summary'] == self::APPROVED) {
+        if($event->data['summary'] == ApproveConst::APPROVED) {
 
-            $versions = p_get_metadata($id, self::METADATA_VERSIONS_KEY);
+            $versions = p_get_metadata($id, ApproveConst::METADATA_VERSIONS_KEY);
             //calculate versions
             if (!$versions) {
                 $this->render_metadata_for_approved_page($id, $event->data['newRevision']);
@@ -205,7 +244,7 @@ class action_plugin_approve_approve extends action_plugin_approve {
                 $curver = $versions[0] + 1;
                 $versions[0] = $curver;
                 $versions[$event->data['newRevision']] = $curver;
-                p_set_metadata($id, array(self::METADATA_VERSIONS_KEY => $versions));
+                p_set_metadata($id, array(ApproveConst::METADATA_VERSIONS_KEY => $versions));
             }
         }
     }
@@ -215,7 +254,7 @@ class action_plugin_approve_approve extends action_plugin_approve {
      * Calculate current version
      *
      * @param $id
-     * @return int
+     * @return array
      */
     protected function render_metadata_for_approved_page($id, $currev=false) {
         if (!$currev) $currev = @filemtime(wikiFN($id));
@@ -231,7 +270,7 @@ class action_plugin_approve_approve extends action_plugin_approve {
         while (count($revs = $changelog->getRevisions($first, $num)) > 0) {
             foreach ($revs as $rev) {
                 $revInfo = $changelog->getRevisionInfo($rev);
-                if ($revInfo['sum'] == self::APPROVED) {
+                if ($revInfo['sum'] == ApproveConst::APPROVED) {
                     $versions[$rev] = $version;
                     $version -= 1;
                 }
@@ -239,7 +278,7 @@ class action_plugin_approve_approve extends action_plugin_approve {
             $first += $num;
         }
 
-        p_set_metadata($id, array(self::METADATA_VERSIONS_KEY => $versions));
+        p_set_metadata($id, array(ApproveConst::METADATA_VERSIONS_KEY => $versions));
 
         return $versions;
     }
@@ -258,7 +297,7 @@ class action_plugin_approve_approve extends action_plugin_approve {
         while (count($revs = $changelog->getRevisions($first, $num)) > 0) {
             foreach ($revs as $rev) {
                 $revInfo = $changelog->getRevisionInfo($rev);
-                if ($revInfo['sum'] == self::APPROVED) {
+                if ($revInfo['sum'] == ApproveConst::APPROVED) {
                     $count += 1;
                 }
             }
