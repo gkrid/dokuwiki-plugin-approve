@@ -6,7 +6,7 @@ use dokuwiki\plugin\approve\meta\ApproveConst;
 if(!defined('DOKU_INC')) die();
 
 
-class syntax_plugin_approve extends DokuWiki_Syntax_Plugin {
+class syntax_plugin_approve_old extends DokuWiki_Syntax_Plugin {
 
     /**
      * @var helper_plugin_publish
@@ -15,7 +15,7 @@ class syntax_plugin_approve extends DokuWiki_Syntax_Plugin {
     function __construct(){
         $this->hlp = plugin_load('helper','approve');
     }
-    
+
     function pattern() {
         return '\[APPROVALS.*?\]';
     }
@@ -33,7 +33,7 @@ class syntax_plugin_approve extends DokuWiki_Syntax_Plugin {
     }
 
     function connectTo($mode) {
-        $this->Lexer->addSpecialPattern($this->pattern(),$mode,'plugin_approve');
+        $this->Lexer->addSpecialPattern($this->pattern(),$mode,'plugin_approve_old');
     }
 
     function handle($match, $state, $pos, Doku_Handler $handler){
@@ -64,10 +64,10 @@ class syntax_plugin_approve extends DokuWiki_Syntax_Plugin {
         $renderer->doc .= '</tr>';
 
 
-		$all_approved = 0;
+        $all_approved = 0;
         $all_approved_ready = 0;
-		$all = 0;
-		
+        $all = 0;
+
         $working_ns = null;
         foreach($pages as $page) {
             // $page: 0 -> pagename, 1 -> true -> approved else false, 2 -> last changed date
@@ -79,23 +79,23 @@ class syntax_plugin_approve extends DokuWiki_Syntax_Plugin {
                 $renderer->doc .= '<tr><td colspan="3"><a href="';
                 $renderer->doc .= wl($this_ns . ':' . $this->getConf('start'));
                 $renderer->doc .= '">';
-				$renderer->doc .= $name_ns;
+                $renderer->doc .= $name_ns;
                 $renderer->doc .= '</a> ';
                 $renderer->doc .= '</td></tr>';
                 $working_ns = $this_ns;
             }
 
             $updated = '<a href="' . wl($page[0]) . '">' . dformat($page[2]) . '</a>';
-            
+
             $class = 'plugin__approve_red';
             $state = $this->getLang('draft');
             $all += 1;
 
             if ($page[1] === 'approved') {
-				$class = 'plugin__approve_green';
-				$state = $this->getLang('approved');
-				$all_approved += 1;
-			} elseif ($page[1] === 'ready for approval' && $this->getConf('ready_for_approval') === 1) {
+                $class = 'plugin__approve_green';
+                $state = $this->getLang('approved');
+                $all_approved += 1;
+            } elseif ($page[1] === 'ready for approval' && $this->getConf('ready_for_approval') === 1) {
                 $class = 'plugin__approve_ready';
                 $state = $this->getLang('marked_approve_ready');
                 $all_approved_ready += 1;
@@ -105,18 +105,18 @@ class syntax_plugin_approve extends DokuWiki_Syntax_Plugin {
             $renderer->doc .= '<td><a href="';
             $renderer->doc .= wl($page[0]);
             $renderer->doc .= '">';
-			if ($conf['useheading'] === '1') {
-				$heading = p_get_first_heading($page[0]);
-				if ($heading != '') {
-					$renderer->doc .= $heading;
-				} else {
-					$renderer->doc .= $page[0];
-				}
-				
-			} else {
-				$renderer->doc .= $page[0];
-			}
-			
+            if ($conf['useheading'] === '1') {
+                $heading = p_get_first_heading($page[0]);
+                if ($heading != '') {
+                    $renderer->doc .= $heading;
+                } else {
+                    $renderer->doc .= $page[0];
+                }
+
+            } else {
+                $renderer->doc .= $page[0];
+            }
+
             $renderer->doc .= '</a></td><td>';
             $renderer->doc .= '<strong>'.$state. '</strong> '. $this->getLang('by'). ' ' . $page[4];
             $renderer->doc .= '</td><td>';
@@ -128,30 +128,30 @@ class syntax_plugin_approve extends DokuWiki_Syntax_Plugin {
             $renderer->doc .= '<tr><td><strong>';
             $renderer->doc .= $this->getLang('all_approved_ready');
             $renderer->doc .= '</strong></td>';
-            
+
             $renderer->doc .= '<td colspan="2">';
             $renderer->doc .= $all_approved_ready.' / '.$all . sprintf(" (%.0f%%)", $all_approved_ready*100/$all);
             $renderer->doc .= '</td></tr>';
         }
-        
+
         $renderer->doc .= '<tr><td><strong>';
         $renderer->doc .= $this->getLang('all_approved');
         $renderer->doc .= '</strong></td>';
-        
+
         $renderer->doc .= '<td colspan="2">';
         $renderer->doc .= $all_approved.' / '.$all . sprintf(" (%.0f%%)", $all_approved*100/$all);
         $renderer->doc .= '</td></tr>';
- 
+
 
 
         $renderer->doc .= '</table>';
         return true;
     }
-    
+
     function _search_helper(&$data, $base, $file, $type, $lvl, $opts) {
-		global $lang;
-		
-		$ns = $opts[0];
+        global $lang;
+
+        $ns = $opts[0];
         $invalid_ns = $opts[1];
 
         if ($type == 'd') {
@@ -167,43 +167,43 @@ class syntax_plugin_approve extends DokuWiki_Syntax_Plugin {
             return false;
         }
 
-		$meta = p_get_metadata($id);
-		//var_dump($meta);
-		$date = $meta['date']['modified'];
-		if (isset($meta['last_change']) && $meta['last_change']['sum'] === ApproveConst::APPROVED) {
-			$approved = 'approved';
-		} elseif (isset($meta['last_change']) && $meta['last_change']['sum'] === ApproveConst::READY_FOR_APPROVAL) {
-			$approved = 'ready for approval';
-		} else {
+        $meta = p_get_metadata($id);
+        //var_dump($meta);
+        $date = $meta['date']['modified'];
+        if (isset($meta['last_change']) && $meta['last_change']['sum'] === ApproveConst::APPROVED) {
+            $approved = 'approved';
+        } elseif (isset($meta['last_change']) && $meta['last_change']['sum'] === ApproveConst::READY_FOR_APPROVAL) {
+            $approved = 'ready for approval';
+        } else {
             $approved = 'not approved';
         }
 
-		if (isset($meta['last_change'])) {
-			$user = $meta['last_change']['user'];
-	
-			if (isset($meta['contributor'][$user])) {
-				$full_name = $meta['contributor'][$user];
-			} else {
-				$full_name = $meta['creator'];
-			}
-		} else {
-			$user = '';
-			$full_name = '('.$lang['external_edit'].')';
-		}
-		
-		
+        if (isset($meta['last_change'])) {
+            $user = $meta['last_change']['user'];
+
+            if (isset($meta['contributor'][$user])) {
+                $full_name = $meta['contributor'][$user];
+            } else {
+                $full_name = $meta['creator'];
+            }
+        } else {
+            $user = '';
+            $full_name = '('.$lang['external_edit'].')';
+        }
+
+
         $data[] = array($id, $approved, $date, $user, $full_name);
 
         return false;
-	}
+    }
 
     function _getPagesFromNamespace($namespace) {
         global $conf;
         $dir = $conf['datadir'] . '/' . str_replace(':', '/', $namespace);
         $pages = array();
         search($pages, $dir, array($this,'_search_helper'),
-				array($namespace, $this->getConf('no_apr_namespaces')));
-				
+               array($namespace, $this->getConf('no_apr_namespaces')));
+
         return $pages;
     }
 
