@@ -54,6 +54,8 @@ class syntax_plugin_approve_table extends DokuWiki_Syntax_Plugin {
             } elseif($key == 'filter' && preg_match($value, null) === false) {
                 msg('approve plugin: invalid filter regex', -1);
                 return false;
+            } elseif ($key == 'summarize') {
+                $value = $value == '0' ? false : true;
             }
             $params[$key] = $value;
         }
@@ -69,7 +71,8 @@ class syntax_plugin_approve_table extends DokuWiki_Syntax_Plugin {
         $defaults = [
             'namespace' => '',
             'filter' => false,
-            'states' => self::STATES
+            'states' => self::STATES,
+            'summarize' => true,
         ];
 
         $params = array_replace($defaults, $params);
@@ -148,33 +151,33 @@ class syntax_plugin_approve_table extends DokuWiki_Syntax_Plugin {
             $renderer->doc .= '</td></tr>';
         }
 
-        if ($this->getConf('ready_for_approval') === 1) {
+        if ($params['summarize']) {
+            if($this->getConf('ready_for_approval') === 1) {
+                $renderer->doc .= '<tr><td><strong>';
+                $renderer->doc .= $this->getLang('all_approved_ready');
+                $renderer->doc .= '</strong></td>';
+
+                $renderer->doc .= '<td colspan="2">';
+                $percent       = 0;
+                if($all > 0) {
+                    $percent = $all_approved_ready * 100 / $all;
+                }
+                $renderer->doc .= $all_approved_ready . ' / ' . $all . sprintf(" (%.0f%%)", $percent);
+                $renderer->doc .= '</td></tr>';
+            }
+
             $renderer->doc .= '<tr><td><strong>';
-            $renderer->doc .= $this->getLang('all_approved_ready');
+            $renderer->doc .= $this->getLang('all_approved');
             $renderer->doc .= '</strong></td>';
 
             $renderer->doc .= '<td colspan="2">';
-            $percent = 0;
-            if ($all > 0) {
-                $percent = $all_approved_ready*100/$all;
+            $percent       = 0;
+            if($all > 0) {
+                $percent = $all_approved * 100 / $all;
             }
-            $renderer->doc .= $all_approved_ready.' / '.$all . sprintf(" (%.0f%%)", $percent);
+            $renderer->doc .= $all_approved . ' / ' . $all . sprintf(" (%.0f%%)", $percent);
             $renderer->doc .= '</td></tr>';
         }
-
-        $renderer->doc .= '<tr><td><strong>';
-        $renderer->doc .= $this->getLang('all_approved');
-        $renderer->doc .= '</strong></td>';
-
-        $renderer->doc .= '<td colspan="2">';
-        $percent = 0;
-        if ($all > 0) {
-            $percent = $all_approved*100/$all;
-        }
-        $renderer->doc .= $all_approved.' / '.$all . sprintf(" (%.0f%%)", $percent);
-        $renderer->doc .= '</td></tr>';
-
-
 
         $renderer->doc .= '</table>';
         return true;
