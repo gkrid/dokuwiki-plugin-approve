@@ -1,7 +1,7 @@
 jQuery(function() {
-	if (JSINFO['approve']['prettyprint'] !== true) {
-		return false;
-	}
+    "use strict";
+    if (! ('approve' in JSINFO)) return false;
+	if (JSINFO['approve']['prettyprint'] !== true) return false;
 	
 	//hide in print
 	jQuery('#dokuwiki__header').addClass('plugin__approve_noprint');
@@ -33,19 +33,19 @@ jQuery(function() {
 
 	var $print_header = jQuery('<h1>').text(h1);
 	cells.push(jQuery("<td>").append($print_header));
-	
-	var status = JSINFO['approve']['status'];
-	if (status) {
 
+	if ('status' in JSINFO['approve']) {
+        var status = JSINFO['approve']['status'];
 		var lang = JSINFO['approve']['lang'];
 		
 		
 		var date = JSINFO['approve']['date'];
 		var author = JSINFO['approve']['author'];
-		var version = JSINFO['approve']['version'];
+
 
 
 		if (status === 'Approved') {
+            var version = JSINFO['approve']['version'];
 			var cont =	lang['approved'] + ' (' + lang['version'] + ': ' + version + ')<br>' + author;
 		} else {
 			var cont =	lang['draft'] + '<br>' + author;
@@ -70,7 +70,7 @@ jQuery(function() {
 	}
 	
 
-	for (cell in cells) {
+	for (var cell in cells) {
 		var $td = cells[cell];
 		$td.css({
 			'border':'1px solid #000', 

@@ -5,3 +5,7 @@
 #plugin__approve_printheader {
     display: table;
 }
+
+div.page {
+    min-height: 0 !important;
+}

@@ -1,7 +1,7 @@
 base approve
 author Szymon Olewniczak
 email solewniczak@rid.pl
-date 2018-05-18
+date 2018-05-22
 name approve
 desc
 url https://www.dokuwiki.org/plugin:approve

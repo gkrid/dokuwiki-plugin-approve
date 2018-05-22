@@ -33,13 +33,17 @@ class action_plugin_approve_prettyprint extends DokuWiki_Action_Plugin {
 			$JSINFO['approve']['prettyprint'] = true;
 
 			$versions = p_get_metadata($ID, ApproveConst::METADATA_VERSIONS_KEY);
-			if (empty($REV)) {
-			    $version = $versions[0];
-            } else {
-			    $version = $versions[$REV];
+            if ($versions) {
+                if(empty($REV)) {
+                    $version = $versions[0];
+                } else {
+                    $version = $versions[$REV];
+                }
+                $JSINFO['approve']['version'] = $version;
             }
-			$JSINFO['approve']['status'] = $this->hlp->page_sum($ID, $REV);
-			$JSINFO['approve']['version'] = $version;
+
+            $page_sum = $this->hlp->page_sum($ID, $REV);
+			$JSINFO['approve']['status'] = $page_sum;
 			$JSINFO['approve']['date'] = dformat($INFO['lastmod']);
 			$JSINFO['approve']['author'] = editorinfo($INFO['editor']);
 		} else {
