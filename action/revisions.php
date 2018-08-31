@@ -1,7 +1,5 @@
 <?php
 
-use dokuwiki\plugin\approve\meta\ApproveConst;
-
 if(!defined('DOKU_INC')) die();
 
 class action_plugin_approve_revisions extends DokuWiki_Action_Plugin {
@@ -29,7 +27,7 @@ class action_plugin_approve_revisions extends DokuWiki_Action_Plugin {
 
 			if (is_array($ref) && isset($ref['_elem']) && $ref['_elem'] == 'opentag' && $ref['_tag'] == 'div' && $ref['class'] == 'li') {
 			    $member = $key;
-            } elseif (is_string($ref) && strstr($ref, ApproveConst::APPROVED)) {
+            } elseif (is_string($ref) && strstr($ref, $this->getConf('sum approved'))) {
                 $event->data->_content[$member]['class'] .= ' plugin__approve_green';
             }
 

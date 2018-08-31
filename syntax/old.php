@@ -1,7 +1,5 @@
 <?php
 
-use dokuwiki\plugin\approve\meta\ApproveConst;
-
 // must be run within DokuWiki
 if(!defined('DOKU_INC')) die();
 
@@ -170,9 +168,9 @@ class syntax_plugin_approve_old extends DokuWiki_Syntax_Plugin {
         $meta = p_get_metadata($id);
         //var_dump($meta);
         $date = $meta['date']['modified'];
-        if (isset($meta['last_change']) && $meta['last_change']['sum'] === ApproveConst::APPROVED) {
+        if (isset($meta['last_change']) && $meta['last_change']['sum'] === $this->getConf('sum approved')) {
             $approved = 'approved';
-        } elseif (isset($meta['last_change']) && $meta['last_change']['sum'] === ApproveConst::READY_FOR_APPROVAL) {
+        } elseif (isset($meta['last_change']) && $meta['last_change']['sum'] === $this->getConf('sum ready for approval')) {
             $approved = 'ready for approval';
         } else {
             $approved = 'not approved';

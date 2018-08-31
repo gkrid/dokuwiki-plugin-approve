@@ -8,7 +8,13 @@ if(!defined('DOKU_INC')) die();
 
 class syntax_plugin_approve_table extends DokuWiki_Syntax_Plugin {
 
-    const STATES = [ApproveConst::APPROVED, ApproveConst::READY_FOR_APPROVAL, ApproveConst::DRAFT];
+    protected $states = [];
+
+    public function __construct() {
+        $this->states = [$this->getConf('sum approved'),
+                         $this->getConf('sum ready for approval'),
+                         $this->getConf('sum draft')];
+    }
 
     function getType() {
         return 'substition';
@@ -45,9 +51,9 @@ class syntax_plugin_approve_table extends DokuWiki_Syntax_Plugin {
                 $value = array_map('strtolower', $value);
                 $value = array_map('ucfirst', $value);
                 foreach ($value as $state) {
-                    if (!in_array($state, self::STATES)) {
+                    if (!in_array($state, $this->states)) {
                         msg('approve plugin: unknown state "'.$state.'" should be: ' .
-                            implode(', ', self::STATES), -1);
+                            implode(', ', $this->states), -1);
                         return false;
                     }
                 }
@@ -71,7 +77,7 @@ class syntax_plugin_approve_table extends DokuWiki_Syntax_Plugin {
         $defaults = [
             'namespace' => '',
             'filter' => false,
-            'states' => self::STATES,
+            'states' => $this->states,
             'summarize' => true,
         ];
 
@@ -217,23 +223,25 @@ class syntax_plugin_approve_table extends DokuWiki_Syntax_Plugin {
 
         //check states
         $sum = $meta['last_change']['sum'];
-        if ($sum == ApproveConst::APPROVED && !in_array(ApproveConst::APPROVED, $states)) {
+        if ($sum == $this->getConf('sum approved') && !in_array($this->getConf('sum approved'), $states)) {
             return false;
         }
 
-        if ($sum == ApproveConst::READY_FOR_APPROVAL && !in_array(ApproveConst::READY_FOR_APPROVAL, $states)) {
+        if ($sum == $this->getConf('sum ready for approval') &&
+            !in_array($this->getConf('sum ready for approval'), $states)) {
             return false;
         }
 
-        if ($sum != ApproveConst::APPROVED && $sum != ApproveConst::READY_FOR_APPROVAL &&
-            !in_array(ApproveConst::DRAFT, $states)) {
+        if ($sum != $this->getConf('sum approved') &&
+            $sum != $this->getConf('sum ready for approval') &&
+            !in_array($this->getConf('sum draft'), $states)) {
             return false;
         }
 
         $date = $meta['date']['modified'];
-        if (isset($meta['last_change']) && $meta['last_change']['sum'] === ApproveConst::APPROVED) {
+        if (isset($meta['last_change']) && $meta['last_change']['sum'] === $this->getConf('sum approved')) {
             $approved = 'approved';
-        } elseif (isset($meta['last_change']) && $meta['last_change']['sum'] === ApproveConst::READY_FOR_APPROVAL) {
+        } elseif (isset($meta['last_change']) && $meta['last_change']['sum'] === $this->getConf('sum ready for approval')) {
             $approved = 'ready for approval';
         } else {
             $approved = 'not approved';
