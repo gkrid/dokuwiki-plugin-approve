@@ -20,7 +20,7 @@ class action_plugin_approve_revisions extends DokuWiki_Action_Plugin {
 	function handle_revisions(Doku_Event $event, $param) {
 		global $ID;
 
-		if ($this->hlp->in_namespace($this->getConf('no_apr_namespaces'), $ID)) return;
+		if (!$this->hlp->use_approve_here($ID)) return;
 
 		$member = NULL;
 		foreach ($event->data->_content as $key => $ref) {

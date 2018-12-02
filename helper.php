@@ -2,7 +2,31 @@
 
 // must be run within Dokuwiki
 if (!defined('DOKU_INC')) die();
-class helper_plugin_approve extends DokuWiki_Plugin { 
+class helper_plugin_approve extends DokuWiki_Plugin {
+
+    /**
+     * Check if we should use approve in page
+     *
+     * @param string $id
+     *
+     * @return bool
+     */
+    function use_approve_here($id) {
+        $apr_namespaces = $this->getConf('apr_namespaces');
+        $no_apr_namespaces = $this->getConf('no_apr_namespaces');
+
+        if ($this->in_namespace($no_apr_namespaces, $id)) {
+            return false;
+        //use apr_namespaces
+        } elseif (trim($apr_namespaces) != '') {
+            if ($this->in_namespace($apr_namespaces, $id)) {
+                return true;
+            }
+            return false;
+        }
+
+        return true;
+    }
      /**
      * checks if an id is within one of the namespaces in $namespace_list
      *

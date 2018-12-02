@@ -28,7 +28,7 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
 	function handle_diff_accept(Doku_Event $event, $param) {
 		global $ID;
 		
-		if ($this->hlp->in_namespace($this->getConf('no_apr_namespaces'), $ID)) return;
+		if (!$this->hlp->use_approve_here($ID)) return;
 		
 		if ($event->data == 'diff' && isset($_GET['approve'])) {
 			ptln('<a href="'.DOKU_URL.'doku.php?id='.$_GET['id'].'&approve=approve">'.$this->getLang('approve').'</a>');
@@ -60,7 +60,7 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
 	function handle_approve(Doku_Event $event, $param) {
 		global $ID;
 		
-		if ($this->hlp->in_namespace($this->getConf('no_apr_namespaces'), $ID)) return;
+		if (!$this->hlp->use_approve_here($ID)) return;
 		
 		if ($event->data == 'show' && isset($_GET['approve'])) {
 		    if ( ! $this->can_approve()) return;
@@ -82,7 +82,7 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
     function handle_viewer(Doku_Event $event, $param) {
         global $REV, $ID;
         if ($event->data != 'show') return;
-        if (auth_quickaclcheck($ID) > AUTH_READ || ($this->hlp->in_namespace($this->getConf('no_apr_namespaces'), $ID))) return;
+        if (auth_quickaclcheck($ID) > AUTH_READ || !$this->hlp->use_approve_here($ID)) return;
         
 	    $last = $this->find_lastest_approved();
 	    //no page is approved
@@ -115,7 +115,7 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
     function handle_display_banner(Doku_Event $event, $param) {
 		global $ID, $REV, $INFO;
 		
-		if ($this->hlp->in_namespace($this->getConf('no_apr_namespaces'), $ID)) return;
+		if (!$this->hlp->use_approve_here($ID)) return;
         if ($event->data != 'show') return;
 		if (!$INFO['exists']) return;
 		
@@ -216,7 +216,7 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
     public function handle_pagesave_before(Doku_Event $event, $param) {
         global $REV;
         $id = $event->data['id'];
-        if ($this->hlp->in_namespace($this->getConf('no_apr_namespaces'), $id)) return;
+        if (!$this->hlp->use_approve_here($id)) return;
 
         //save page if summary is provided
         if($event->data['summary'] == $this->getConf('sum approved')) {
@@ -231,7 +231,7 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
     public function handle_pagesave_after(Doku_Event $event, $param) {
         global $REV;
         $id = $event->data['id'];
-        if ($this->hlp->in_namespace($this->getConf('no_apr_namespaces'), $id)) return;
+        if (!$this->hlp->use_approve_here($id)) return;
 
         //save page if summary is provided
         if($event->data['summary'] == $this->getConf('sum approved')) {
