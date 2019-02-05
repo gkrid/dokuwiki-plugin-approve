@@ -219,7 +219,8 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
         if (!$this->hlp->use_approve_here($id)) return;
 
         //save page if summary is provided
-        if($event->data['summary'] == $this->getConf('sum approved')) {
+        if($event->data['summary'] == $this->getConf('sum approved') ||
+            $event->data['summary'] == $this->getConf('sum ready for approval')) {
             $event->data['contentChanged'] = true;
         }
     }
