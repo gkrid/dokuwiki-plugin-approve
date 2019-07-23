@@ -9,16 +9,32 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
     /** @var helper_plugin_sqlite */
     protected $sqlite;
 
+    /** @var helper_plugin_approve */
+    protected $helper;
+
     /**
      * @return helper_plugin_sqlite
      */
-    public function sqlite() {
+    protected function sqlite() {
         if (!$this->sqlite) {
+            /** @var helper_plugin_approve_db $db_helper */
             $db_helper = plugin_load('helper', 'approve_db');
             $this->sqlite = $db_helper->getDB();
         }
         return $this->sqlite;
     }
+
+    /**
+     * @return helper_plugin_approve
+     */
+    protected function helper() {
+        if (!$this->helper) {
+            $helper = plugin_load('helper', 'approve');
+            $this->helper = $helper;
+        }
+        return $this->helper;
+    }
+
 
     /**
      * @param Doku_Event_Handler $controller
@@ -30,34 +46,7 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
         $controller->register_hook('ACTION_ACT_PREPROCESS', 'BEFORE', $this, 'handle_viewer');
         $controller->register_hook('TPL_ACT_RENDER', 'BEFORE', $this, 'handle_display_banner');
         $controller->register_hook('COMMON_WIKIPAGE_SAVE', 'AFTER', $this, 'handle_pagesave_after');
-        // ensure a page revision is created when summary changes:
-//        $controller->register_hook('COMMON_WIKIPAGE_SAVE', 'BEFORE', $this, 'handle_pagesave_before');
-//        $controller->register_hook('COMMON_WIKIPAGE_SAVE', 'AFTER', $this, 'handle_pagesave_after');
     }
-
-    /**
-     * @param $id
-     * @return bool
-     */
-    protected function use_approve_here($id) {
-        $res = $this->sqlite()->query('SELECT page FROM page WHERE page=? AND hidden=0', $id);
-        if ($this->sqlite()->res2single($res)) {
-            return true;
-        }
-        return false;
-    }
-
-    /**
-     * @param $id
-     * @return bool|string
-     */
-    protected function find_last_approved($id) {
-        $res = $this->sqlite()->query('SELECT rev FROM revision
-                                WHERE page=? AND approved IS NOT NULL
-                                ORDER BY rev DESC LIMIT 1', $id);
-        return $this->sqlite()->res2single($res);
-    }
-
 
     /**
      * @param Doku_Event $event
@@ -65,7 +54,7 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
     public function handle_diff_accept(Doku_Event $event) {
 		global $INFO;
 
-		if (!$this->use_approve_here($INFO['id'])) return;
+		if (!$this->helper()->use_approve_here($INFO['id'])) return;
 
 		if ($event->data == 'diff' && isset($_GET['approve'])) {
 		    $href = wl($INFO['id'], ['approve' => 'approve']);
@@ -84,31 +73,21 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
     public function handle_showrev(Doku_Event $event) {
         global $INFO;
 
-        if (!$this->use_approve_here($INFO['id'])) return;
+        if (!$this->helper()->use_approve_here($INFO['id'])) return;
 
-        $last_approved_rev = $this->find_last_approved($INFO['id']);
+        $last_approved_rev = $this->helper()->find_last_approved($INFO['id']);
 		if ($last_approved_rev == $INFO['rev']) {
             $event->preventDefault();
         }
 	}
 
-//	function can_approve() {
-//		global $ID;
-//		return auth_quickaclcheck($ID) >= AUTH_DELETE;
-//	}
-//
-//    function can_edit() {
-//		global $ID;
-//		return auth_quickaclcheck($ID) >= AUTH_EDIT;
-//	}
-
-    /**
+	/**
      * @param Doku_Event $event
      */
     public function handle_approve(Doku_Event $event) {
 		global $INFO;
 
-        if (!$this->use_approve_here($INFO['id'])) return;
+        if (!$this->helper()->use_approve_here($INFO['id'])) return;
 		
 		if ($event->data == 'show' && isset($_GET['approve']) &&
             auth_quickaclcheck($INFO['id']) >= AUTH_DELETE) {
@@ -149,9 +128,9 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
         //apply only to current page
         if (!$INFO['rev']) return;
         if (auth_quickaclcheck($INFO['id']) >= AUTH_EDIT) return;
-        if (!$this->use_approve_here($INFO['id'])) return;
+        if (!$this->helper()->use_approve_here($INFO['id'])) return;
 
-        $last_approved_rev = $this->find_last_approved($INFO['id']);
+        $last_approved_rev = $this->helper()->find_last_approved($INFO['id']);
         //no page is approved
         if (!$last_approved_rev) return;
 
@@ -162,24 +141,6 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
 	    header("Location: " . wl($INFO['id'], ['rev' => $last_approved_rev]));
 	}
 
-//	function find_lastest_approved() {
-//		global $ID;
-//		$m = p_get_metadata($ID);
-//		$sum = $m['last_change']['sum'];
-//		if ($sum == $this->getConf('sum approved'))
-//			return 0;
-//
-//		$changelog = new PageChangeLog($ID);
-//
-//		$chs = $changelog->getRevisions(0, 10000);
-//		foreach ($chs as $rev) {
-//			$ch = $changelog->getRevisionInfo($rev);
-//			if ($ch['sum'] == $this->getConf('sum approved'))
-//				return $rev;
-//		}
-//		return -1;
-//	}
-
     /**
      * @param Doku_Event $event
      */
@@ -188,7 +149,7 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
 
         if ($event->data != 'show') return;
         if (!$INFO['exists']) return;
-        if (!$this->use_approve_here($INFO['id'])) return;
+        if (!$this->helper()->use_approve_here($INFO['id'])) return;
 
 //        $last_change_date = p_get_metadata($INFO['id'], 'last_change date');
         $last_change_date = @filemtime(wikiFN($INFO['id']));
@@ -338,7 +299,7 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
      * @return void
      */
     public function handle_pagesave_after(Doku_Event $event) {
-        //no content was mde
+        //no content was changed
         if (!$event->data['contentChanged']) return;
 
         $changeType = $event->data['changeType'];
@@ -351,7 +312,6 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
         }
 
         $id = $event->data['id'];
-        //TODO: if created, if deleted
         switch ($changeType) {
             case DOKU_CHANGE_TYPE_EDIT:
             case DOKU_CHANGE_TYPE_REVERT:
@@ -394,9 +354,11 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
                 break;
             case DOKU_CHANGE_TYPE_CREATE:
                 $last_change_date = $event->data['newRevision'];
-                //TODO should be checked against no_approve_rev
+                $hidden = $this->helper()->in_hidden_namespace($id);
+
                 $this->sqlite()->storeEntry('page', [
-                    'page' => $id
+                    'page' => $id,
+                    'hidden' => $hidden
                 ]);
 
                 $this->sqlite()->storeEntry('revision', [
@@ -407,107 +369,4 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
                 break;
         }
     }
-
-    /**
-     * Check if the page has to be changed
-     *
-     * @param Doku_Event $event  event object by reference
-     * @param mixed      $param  [the parameters passed as fifth argument to register_hook() when this
-     *                           handler was registered]
-     * @return void
-     */
-//    public function handle_pagesave_before(Doku_Event $event, $param) {
-//        global $REV;
-//        $id = $event->data['id'];
-//        if (!$this->hlp->use_approve_here($id)) return;
-//
-//        //save page if summary is provided
-//        if($event->data['summary'] == $this->getConf('sum approved') ||
-//            $event->data['summary'] == $this->getConf('sum ready for approval')) {
-//            $event->data['contentChanged'] = true;
-//        }
-//    }
-
-    /**
-     * @param Doku_Event $event
-     * @param            $param
-     */
-//    public function handle_pagesave_after(Doku_Event $event, $param) {
-//        global $REV;
-//        $id = $event->data['id'];
-//        if (!$this->hlp->use_approve_here($id)) return;
-//
-//        //save page if summary is provided
-//        if($event->data['summary'] == $this->getConf('sum approved')) {
-//
-//            $versions = p_get_metadata($id, ApproveConst::METADATA_VERSIONS_KEY);
-//            //calculate versions
-//            if (!$versions) {
-//                $this->render_metadata_for_approved_page($id, $event->data['newRevision']);
-//            } else {
-//                $curver = $versions[0] + 1;
-//                $versions[0] = $curver;
-//                $versions[$event->data['newRevision']] = $curver;
-//                p_set_metadata($id, array(ApproveConst::METADATA_VERSIONS_KEY => $versions));
-//            }
-//        }
-//    }
-
-
-    /**
-     * Calculate current version
-     *
-     * @param $id
-     * @return array
-     */
-//    protected function render_metadata_for_approved_page($id, $currev=false) {
-//        if (!$currev) $currev = @filemtime(wikiFN($id));
-//
-//        $version = $this->approved($id);
-//        //version for current page
-//        $curver = $version + 1;
-//        $versions = array(0 => $curver, $currev => $curver);
-//
-//        $changelog = new PageChangeLog($id);
-//        $first = 0;
-//        $num = 100;
-//        while (count($revs = $changelog->getRevisions($first, $num)) > 0) {
-//            foreach ($revs as $rev) {
-//                $revInfo = $changelog->getRevisionInfo($rev);
-//                if ($revInfo['sum'] == $this->getConf('sum approved')) {
-//                    $versions[$rev] = $version;
-//                    $version -= 1;
-//                }
-//            }
-//            $first += $num;
-//        }
-//
-//        p_set_metadata($id, array(ApproveConst::METADATA_VERSIONS_KEY => $versions));
-//
-//        return $versions;
-//    }
-
-    /**
-     * Get the number of approved pages
-     * @param $id
-     * @return int
-     */
-//    protected function approved($id) {
-//        $count = 0;
-//
-//        $changelog = new PageChangeLog($id);
-//        $first = 0;
-//        $num = 100;
-//        while (count($revs = $changelog->getRevisions($first, $num)) > 0) {
-//            foreach ($revs as $rev) {
-//                $revInfo = $changelog->getRevisionInfo($rev);
-//                if ($revInfo['sum'] == $this->getConf('sum approved')) {
-//                    $count += 1;
-//                }
-//            }
-//            $first += $num;
-//        }
-//
-//        return $count;
-//    }
 }

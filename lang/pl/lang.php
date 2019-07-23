@@ -19,3 +19,10 @@ $lang['all_approved_ready'] = 'Do zatwierdzenia';
 $lang['by'] = 'przez';
 
 $lang['version'] = 'wersja';
+
+// menu entry for admin plugins
+$lang['menu'] = 'Zarządzanie Zatwierdzeniami';
+
+$lang['admin config no_apr_namespaces'] = 'Przestrzenie nazw dla których wtyczka <strong>nie będzie</strong> używana (rozdzielone spacjami).';
+$lang['admin settings'] = 'Ustawienia';
+$lang['admin updated'] = 'Ustawienia zostały zmienione';

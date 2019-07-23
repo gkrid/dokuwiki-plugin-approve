@@ -20,3 +20,10 @@ $lang['all_approved_ready'] = 'Ready for approval';
 $lang['by'] = 'by';
 
 $lang['version'] = 'version';
+
+// menu entry for admin plugins
+$lang['menu'] = 'Approve Management';
+
+$lang['admin config no_apr_namespaces'] = 'Namespaces this plugin <strong>does not</strong> apply to (space separated list).';
+$lang['admin settings'] = 'Settings';
+$lang['admin updated'] = 'Settings updated successfully.';
