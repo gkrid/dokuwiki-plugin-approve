@@ -22,8 +22,9 @@ $lang['by'] = 'by';
 $lang['version'] = 'version';
 
 // menu entry for admin plugins
-$lang['menu'] = 'Approve Management';
+$lang['menu'] = 'Approve Assignments';
 
-$lang['admin config no_apr_namespaces'] = 'Namespaces this plugin <strong>does not</strong> apply to (space separated list).';
-$lang['admin settings'] = 'Settings';
-$lang['admin updated'] = 'Settings updated successfully.';
+$lang['admin btn_delete'] = 'Delete';
+$lang['admin btn_add'] = 'Add';
+$lang['admin h_assignment_namespace'] = 'Page/Namespace';
+$lang['admin h_assignment_maintainer'] = 'Maintainer';

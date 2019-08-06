@@ -24,6 +24,29 @@ class helper_plugin_approve extends DokuWiki_Plugin {
      * @return bool
      */
     public function use_approve_here($id) {
+        //check for config update
+        $key = 'no_apr_namespaces';
+        $res = $this->sqlite()->query('SELECT value FROM config WHERE key=?', $key);
+        $no_apr_namespaces_db = $this->sqlite()->res2single($res);
+        $no_apr_namespaces_conf = $this->getConf($key);
+        //update internal config
+        if ($no_apr_namespaces_db != $no_apr_namespaces_conf) {
+            $this->sqlite()->query('UPDATE config SET value=? WHERE key=?', $no_apr_namespaces_conf, $key);
+
+            $res = $this->sqlite()->query('SELECT page, hidden FROM page');
+            $pages = $this->sqlite()->res2arr($res);
+            foreach ($pages as $page) {
+                $id = $page['page'];
+                $hidden = $page['hidden'];
+                $in_hidden_namespace = $this->in_hidden_namespace($id, $no_apr_namespaces_conf);
+                $new_hidden = $in_hidden_namespace ? '1' : '0';
+
+                if ($hidden != $new_hidden) {
+                    $this->sqlite()->query('UPDATE page SET hidden=? WHERE page=?', $new_hidden, $id);
+                }
+            }
+        }
+
         $res = $this->sqlite()->query('SELECT page FROM page WHERE page=? AND hidden=0', $id);
         if ($this->sqlite()->res2single($res)) {
             return true;

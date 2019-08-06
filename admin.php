@@ -51,46 +51,116 @@ class admin_plugin_approve extends DokuWiki_Admin_Plugin
         return 1;
     }
 
+    protected function getPages() {
+        global $conf;
+        $datadir = $conf['datadir'];
+        if (substr($datadir, -1) != '/') {
+            $datadir .= '/';
+        }
+
+        $directory = new RecursiveDirectoryIterator($datadir, FilesystemIterator::SKIP_DOTS);
+        $iterator = new RecursiveIteratorIterator($directory);
+
+        $pages = [];
+        foreach ($iterator as $fileinfo) {
+            if (!$fileinfo->isFile()) continue;
+
+            $path = $fileinfo->getPath();
+            $ns = str_replace('/', ':', substr($path, strlen($datadir)));
+
+            if (!isset($pages[$ns])) {
+                $pages[$ns] = [];
+            }
+
+            //remove .txt
+            $pages[$ns][] = substr($fileinfo->getFilename(), 0, -4);
+        }
+
+
+        return $pages;
+    }
+
+    protected function updatePage()
+    {
+        $res = $this->sqlite()->query('SELECT * FROM maintainer');
+        $assignments = $this->sqlite()->res2arr($res);
+
+        $weighted_assigments = [];
+        foreach ($assignments as $assignment) {
+            $ns = $assignment['namespace'];
+            //more general namespaces are overridden by more specific ones.
+            if (substr($ns, -1) == '*') {
+                $weight = substr_count($ns, ':');
+            } else {
+                $weight = PHP_INT_MAX;
+            }
+
+            $assignment['weight'] = $weight;
+            $weighted_assigments[] = $assignment;
+        }
+        array_multisort(array_column($weighted_assigments, 'weight'), $weighted_assigments);
+
+        $pages = [];
+        $wikiPages = $this->getPages();
+        foreach ($weighted_assigments as $assignment) {
+            $ns = $assignment['namespace'];
+            $maintainer = $assignment['maintainer'];
+            if (substr($ns, -2) == '**') {
+                //remove '**'
+                $ns = substr($ns, 0, -2);
+                $ns = trim($ns, ':');
+                foreach ($wikiPages as $page) {
+//                    if (substr($page, 0, strlen($ns)) === $ns) {
+//
+//                    }
+                }
+
+            } elseif (substr($ns, -2) == '*') {
+                //remove '*'
+                $ns = substr($ns, 0, -2);
+                $ns = trim($ns, ':');
+            } else {
+                $ns = trim($ns, ':');
+                $pages[$ns] = $maintainer;
+            }
+        }
+
+        return true;
+    }
+
     /**
      * Should carry out any processing required by the plugin.
      */
     public function handle()
     {
+        global $ID;
+
         /* @var Input */
         global $INPUT;
-        global $lang;
 
-        $action = $INPUT->str('action');
-        $updated = [];
-        if ($action == 'save_config') {
-            $res = $this->sqlite()->query('SELECT key, value FROM config');
-            $config_options = $this->sqlite()->res2arr($res);
-            foreach ($config_options as $option) {
-                $key = $option['key'];
-                $value = $option['value'];
-                $new_value = $INPUT->str($key);
+        if($INPUT->str('action') && $INPUT->arr('assignment') && checkSecurityToken()) {
+            $assignment = $INPUT->arr('assignment');
+            //insert empty string as NULL
+            if ($INPUT->str('action') === 'delete') {
+                $ok = $this->sqlite()->query('DELETE FROM maintainer WHERE id=?', $assignment['id']);
+                if (!$ok) msg('failed to remove pattern', -1);
 
-                if ($value != $new_value) {
-                    $updated[$key] = $new_value;
-                    $this->sqlite()->query('UPDATE config SET value=? WHERE key=?', $new_value, $key);
+                $this->updatePage();
+            } else if ($INPUT->str('action') === 'add' && !blank($assignment['assign'])) {
+                if (blank($assignment['maintainer'])) {
+                    $q = 'INSERT INTO maintainer(namespace) VALUES (?)';
+                    $ok = $this->sqlite()->query($q, $assignment['assign']);
+                } else {
+                    $q = 'INSERT INTO maintainer(namespace,maintainer) VALUES (?,?)';
+                    $ok = $this->sqlite()->query($q, $assignment['assign'], $assignment['maintainer']);
                 }
+
+                if (!$ok) msg('failed to add pattern', -1);
+
+                $this->updatePage();
             }
 
-            if (array_key_exists('no_apr_namespaces', $updated)) {
-                $res = $this->sqlite()->query('SELECT page, hidden FROM page');
-                $pages = $this->sqlite()->res2arr($res);
-                foreach ($pages as $page) {
-                    $id = $page['page'];
-                    $hidden = $page['hidden'];
-                    $in_hidden_namespace = $this->helper()->in_hidden_namespace($id, $updated['no_apr_namespaces']);
-                    $new_hidden = $in_hidden_namespace ? '1' : '0';
-
-                    if ($hidden != $new_hidden) {
-                        $this->sqlite()->query('UPDATE page SET hidden=? WHERE page=?', $new_hidden, $id);
-                    }
-                }
-            }
-            msg($this->getLang('admin updated'), 1);
+            send_redirect(wl($ID, array('do' => 'admin', 'page' => 'approve'), true, '&'));
         }
     }
 
@@ -102,132 +172,65 @@ class admin_plugin_approve extends DokuWiki_Admin_Plugin
         global $lang;
 
         global $ID;
-        /* @var Input */
-        global $INPUT;
+        /* @var DokuWiki_Auth_Plugin */
+        global $auth;
 
-        ptln('<h1>' . $this->getLang('menu') . '</h1>');
+        $res = $this->sqlite()->query('SELECT * FROM maintainer');
+        $assignments = $this->sqlite()->res2arr($res);
 
-        ptln('<div id="plugin__approve_admin">');
+        echo $this->locale_xhtml('assignments_intro');
 
-        $res = $this->sqlite()->query('SELECT key, value FROM config');
-        $config_options = $this->sqlite()->res2arr($res);
+        echo '<form action="' . wl($ID) . '" action="post">';
+        echo '<input type="hidden" name="do" value="admin" />';
+        echo '<input type="hidden" name="page" value="approve" />';
+        echo '<input type="hidden" name="sectok" value="' . getSecurityToken() . '" />';
+        echo '<table class="inline">';
 
-        $form = new \dokuwiki\Form\Form();
-        $form->setHiddenField('action', 'save_config');
-        $form->addFieldsetOpen($this->getLang('admin settings'));
-        $form->addHTML('<table>');
-        foreach ($config_options as $option) {
-            $key = $option['key'];
-            $value = $option['value'];
+        // header
+        echo '<tr>';
+        echo '<th>'.$this->getLang('admin h_assignment_namespace').'</th>';
+        echo '<th>'.$this->getLang('admin h_assignment_maintainer').'</th>';
+        echo '<th></th>';
+        echo '</tr>';
 
-            $id = "plugin__approve_config_$key";
+        // existing assignments
+        foreach($assignments as $assignment) {
+            $id = $assignment['id'];
+            $namespace = $assignment['namespace'];
+            $maintainer = $assignment['maintainer'] ? $assignment['maintainer'] : '---';
 
-            $input = new \dokuwiki\Form\InputElement('text', $key);
-            $input->id($id);
+            $link = wl(
+                $ID, array(
+                    'do' => 'admin',
+                    'page' => 'approve',
+                    'action' => 'delete',
+                    'sectok' => getSecurityToken(),
+                    'assignment[id]' => $id
+                )
+            );
 
-            $form->addHTML('<tr>');
-
-            $form->addHTML('<td>');
-            $label = $this->getLang("admin config $key");
-            $form->addHTML("<label for=\"$id\">$label</label>");
-            $form->addHTML('</td>');
-
-
-            $form->addHTML('<td>');
-
-            $input->val($value);
-            $form->addElement($input);
-            $form->addHTML('</td>');
-
-            $form->addHTML('</tr>');
-        }
-        $form->addHTML('</table>');
-        $form->addButton('', $lang['btn_save']);
-
-        $form->addFieldsetClose();
-
-
-        ptln($form->toHTML());
-
-        return;
-
-        $form = new \dokuwiki\Form\Form();
-        $filter_input = new \dokuwiki\Form\InputElement('text', 'filter');
-        $filter_input->attr('placeholder', $this->getLang('search page'));
-        $form->addElement($filter_input);
-
-        $form->addButton('', $this->getLang('btn filter'));
-
-        $form->addHTML('<label class="outdated">');
-        $form->addCheckbox('outdated');
-        $form->addHTML($this->getLang('show outdated only'));
-        $form->addHTML('</label>');
-
-
-        ptln($form->toHTML());
-        ptln('<table>');
-        ptln('<tr>');
-        $headers = ['page', 'maintainer', 'cycle', 'current', 'uptodate'];
-        foreach ($headers as $header) {
-            $lang = $this->getLang("h $header");
-            $param = [
-                'do' => 'admin',
-                'page' => 'watchcycle',
-                'sortby' => $header,
-            ];
-            $icon = '';
-            if ($INPUT->str('sortby') == $header) {
-                if ($INPUT->int('desc') == 0) {
-                    $param['desc'] = 1;
-                    $icon = '↑';
-                } else {
-                    $param['desc'] = 0;
-                    $icon = '↓';
-                }
-            }
-            $href = wl($ID, $param);
-
-            ptln('<th><a href="' . $href . '">' . $icon . ' ' . $lang . '</a></th>');
-        }
-        $q = 'SELECT page, maintainer, cycle, DAYS_AGO(last_maintainer_rev) AS current, uptodate FROM watchcycle';
-        $where = [];
-        $q_args = [];
-        if ($INPUT->str('filter') != '') {
-            $where[] = 'page LIKE ?';
-            $q_args[] = '%' . $INPUT->str('filter') . '%';
-        }
-        if ($INPUT->has('outdated')) {
-            $where[] = 'uptodate=0';
+            echo '<tr>';
+            echo '<td>' . hsc($namespace) . '</td>';
+            echo '<td>' . hsc($maintainer) . '</td>';
+            echo '<td><a href="' . $link . '">'.$this->getLang('admin btn_delete').'</a></td>';
+            echo '</tr>';
         }
 
-        if (count($where) > 0) {
-            $q .= ' WHERE ';
-            $q .= implode(' AND ', $where);
+        // new assignment form
+        echo '<tr>';
+        echo '<td><input type="text" name="assignment[assign]" /></td>';
+        echo '<td>';
+        echo '<select name="assignment[maintainer]">';
+        echo '<option value="">---</option>';
+        foreach($auth->retrieveUsers() as $login => $data) {
+            echo '<option value="' . hsc($login) . '">' . hsc($data['name']) . '</option>';
         }
+        echo '</select>';
+        echo '</td>';
+        echo '<td><button type="submit" name="action" value="add">'.$this->getLang('admin btn_add').'</button></td>';
+        echo '</tr>';
 
-        if ($INPUT->has('sortby') && in_array($INPUT->str('sortby'), $headers)) {
-            $q .= ' ORDER BY ' . $INPUT->str('sortby');
-            if ($INPUT->int('desc') == 1) {
-                $q .= ' DESC';
-            }
-        }
-
-        $res = $sqlite->query($q, $q_args);
-        while ($row = $sqlite->res2row($res)) {
-            ptln('<tr>');
-            ptln('<td><a href="' . wl($row['page']) . '" class="wikilink1">' . $row['page'] . '</a></td>');
-            ptln('<td>' . $row['maintainer'] . '</td>');
-            ptln('<td>' . $row['cycle'] . '</td>');
-            ptln('<td>' . $row['current'] . '</td>');
-            $icon = $row['uptodate'] == 1 ? '✓' : '✕';
-            ptln('<td>' . $icon . '</td>');
-            ptln('</tr>');
-        }
-
-        ptln('</tr>');
-        ptln('</table>');
-
-        ptln('</div>');
+        echo '</table>';
     }
 }
 
