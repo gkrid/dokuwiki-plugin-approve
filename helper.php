@@ -20,10 +20,9 @@ class helper_plugin_approve extends DokuWiki_Plugin {
     }
 
     /**
-     * @param $id
-     * @return bool
+     * @return string
      */
-    public function use_approve_here($id) {
+    public function no_apr_namespace() {
         //check for config update
         $key = 'no_apr_namespaces';
         $res = $this->sqlite()->query('SELECT value FROM config WHERE key=?', $key);
@@ -47,6 +46,18 @@ class helper_plugin_approve extends DokuWiki_Plugin {
             }
         }
 
+        return $no_apr_namespaces_conf;
+    }
+
+    /**
+     * @param $id
+     * @return bool
+     */
+    public function use_approve_here($id) {
+
+        //check if we should update no_apr_namespace
+        $this->no_apr_namespace();
+
         $res = $this->sqlite()->query('SELECT page FROM page WHERE page=? AND hidden=0', $id);
         if ($this->sqlite()->res2single($res)) {
             return true;
@@ -67,8 +78,7 @@ class helper_plugin_approve extends DokuWiki_Plugin {
 
     public function get_hidden_namespaces_list($no_apr_namespaces=null) {
         if (!$no_apr_namespaces) {
-            $res = $this->sqlite()->query('SELECT value FROM config WHERE key=?', 'no_apr_namespaces');
-            $no_apr_namespaces = $this->sqlite()->res2single($res);
+            $no_apr_namespaces = $this->no_apr_namespace();
         }
 
         $no_apr_namespaces_list = preg_split('/\s+/', $no_apr_namespaces,-1,
@@ -82,6 +92,7 @@ class helper_plugin_approve extends DokuWiki_Plugin {
 
     /**
      * @param $id
+     * @param null $no_apr_namespaces
      * @return bool|string
      */
     public function in_hidden_namespace($id, $no_apr_namespaces=null) {

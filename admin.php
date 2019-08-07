@@ -62,20 +62,15 @@ class admin_plugin_approve extends DokuWiki_Admin_Plugin
         $iterator = new RecursiveIteratorIterator($directory);
 
         $pages = [];
+        /** @var SplFileInfo $fileinfo */
         foreach ($iterator as $fileinfo) {
             if (!$fileinfo->isFile()) continue;
 
-            $path = $fileinfo->getPath();
-            $ns = str_replace('/', ':', substr($path, strlen($datadir)));
-
-            if (!isset($pages[$ns])) {
-                $pages[$ns] = [];
-            }
-
+            $path = $fileinfo->getPathname();
             //remove .txt
-            $pages[$ns][] = substr($fileinfo->getFilename(), 0, -4);
+            $id = str_replace('/', ':', substr($path, strlen($datadir), -4));
+            $pages[] = $id;
         }
-
 
         return $pages;
     }
@@ -100,32 +95,49 @@ class admin_plugin_approve extends DokuWiki_Admin_Plugin
         }
         array_multisort(array_column($weighted_assigments, 'weight'), $weighted_assigments);
 
-        $pages = [];
+        $approvePages = [];
         $wikiPages = $this->getPages();
         foreach ($weighted_assigments as $assignment) {
-            $ns = $assignment['namespace'];
+            $ns = ltrim($assignment['namespace'], ':');
             $maintainer = $assignment['maintainer'];
             if (substr($ns, -2) == '**') {
                 //remove '**'
                 $ns = substr($ns, 0, -2);
-                $ns = trim($ns, ':');
-                foreach ($wikiPages as $page) {
-//                    if (substr($page, 0, strlen($ns)) === $ns) {
-//
-//                    }
+                foreach ($wikiPages as $id) {
+                    if (substr($id, 0, strlen($ns)) == $ns) {
+                        $approvePages[$id] = $maintainer;
+                    }
                 }
-
-            } elseif (substr($ns, -2) == '*') {
+            } elseif (substr($ns, -1) == '*') {
                 //remove '*'
-                $ns = substr($ns, 0, -2);
-                $ns = trim($ns, ':');
+                $ns = substr($ns, 0, -1);
+                foreach ($wikiPages as $id) {
+                    $noNS = substr($id, strlen($id));
+                    if (strpos($noNS, ':') === FALSE &&
+                        substr($id, 0, strlen($ns)) == $ns) {
+                        $approvePages[$id] = $maintainer;
+                    }
+                }
             } else {
-                $ns = trim($ns, ':');
-                $pages[$ns] = $maintainer;
+                $approvePages[$ns] = $maintainer;
             }
         }
 
-        return true;
+        //clean current settings
+        $this->sqlite()->query('DELETE FROM page');
+        $no_apr_namespace = $this->helper()->no_apr_namespace();
+        foreach ($approvePages as $id => $maintainer) {
+            $in_hidden_namespace = $this->helper()->in_hidden_namespace($id, $no_apr_namespace);
+            $hidden = $in_hidden_namespace ? '1' : '0';
+            if (blank($maintainer)) {
+                $q = 'INSERT INTO page(page,hidden) VALUES (?,?)';
+                $this->sqlite()->query($q, $id, $hidden);
+            } else {
+                $q = 'INSERT INTO page(page,maintainer,hidden) VALUES (?,?,?)';
+                $this->sqlite()->query($q, $id, $maintainer, $hidden);
+            }
+        }
+
     }
 
     /**
@@ -142,21 +154,16 @@ class admin_plugin_approve extends DokuWiki_Admin_Plugin
             $assignment = $INPUT->arr('assignment');
             //insert empty string as NULL
             if ($INPUT->str('action') === 'delete') {
-                $ok = $this->sqlite()->query('DELETE FROM maintainer WHERE id=?', $assignment['id']);
-                if (!$ok) msg('failed to remove pattern', -1);
-
+                $this->sqlite()->query('DELETE FROM maintainer WHERE id=?', $assignment['id']);
                 $this->updatePage();
             } else if ($INPUT->str('action') === 'add' && !blank($assignment['assign'])) {
                 if (blank($assignment['maintainer'])) {
                     $q = 'INSERT INTO maintainer(namespace) VALUES (?)';
-                    $ok = $this->sqlite()->query($q, $assignment['assign']);
+                    $this->sqlite()->query($q, $assignment['assign']);
                 } else {
                     $q = 'INSERT INTO maintainer(namespace,maintainer) VALUES (?,?)';
-                    $ok = $this->sqlite()->query($q, $assignment['assign'], $assignment['maintainer']);
+                    $this->sqlite()->query($q, $assignment['assign'], $assignment['maintainer']);
                 }
-
-                if (!$ok) msg('failed to add pattern', -1);
-
                 $this->updatePage();
             }
 
@@ -172,7 +179,7 @@ class admin_plugin_approve extends DokuWiki_Admin_Plugin
         global $lang;
 
         global $ID;
-        /* @var DokuWiki_Auth_Plugin */
+        /* @var DokuWiki_Auth_Plugin $auth */
         global $auth;
 
         $res = $this->sqlite()->query('SELECT * FROM maintainer');
