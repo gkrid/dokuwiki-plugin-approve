@@ -1,21 +1,18 @@
 <?php
 
-use dokuwiki\plugin\approve\meta\ApproveConst;
-use dokuwiki\plugin\approve\meta\PageSearch;
-
 // must be run within DokuWiki
 if(!defined('DOKU_INC')) die();
 
 
 class syntax_plugin_approve_table extends DokuWiki_Syntax_Plugin {
 
-    protected $states = [];
-
-    public function __construct() {
-        $this->states = [$this->getConf('sum approved'),
-                         $this->getConf('sum ready for approval'),
-                         $this->getConf('sum draft')];
-    }
+    protected $states = ['approved', 'draft', 'ready for approval'];
+//
+//    public function __construct() {
+//        $this->states = [$this->getConf('sum approved'),
+//                         $this->getConf('sum ready for approval'),
+//                         $this->getConf('sum draft')];
+//    }
 
     function getType() {
         return 'substition';
@@ -63,6 +60,8 @@ class syntax_plugin_approve_table extends DokuWiki_Syntax_Plugin {
                 return false;
             } elseif ($key == 'summarize') {
                 $value = $value == '0' ? false : true;
+            } elseif ($key == 'namespace') {
+                $value = trim(cleanID($value), ':');
             }
             $params[$key] = $value;
         }
@@ -71,11 +70,15 @@ class syntax_plugin_approve_table extends DokuWiki_Syntax_Plugin {
 
     function render($mode, Doku_Renderer $renderer, $params) {
         global $conf;
+        /** @var DokuWiki_Auth_Plugin $auth */
+        global $auth;
 
         if ($mode != 'xhtml') return false;
         if ($params === false) return false;
 
-        $pageSearch = new PageSearch();
+        /** @var \helper_plugin_ireadit_db $db_helper */
+        $db_helper = plugin_load('helper', 'approve_db');
+        $sqlite = $db_helper->getDB();
 
         $defaults = [
             'namespace' => '',
@@ -86,17 +89,21 @@ class syntax_plugin_approve_table extends DokuWiki_Syntax_Plugin {
 
         $params = array_replace($defaults, $params);
 
-        $namespace = cleanID(getNS($params['namespace'] . ":*"));
-
-        $pages = $pageSearch->getPagesFromNamespace($namespace, $params['filter'], $params['states']);
-
-        usort($pages, array($pageSearch, 'pageSorter'));
+        $q = "SELECT page.page, page.maintainer, revision.rev, revision.approved, revision.approved_by,
+                    revision.ready_for_approval, revision.ready_for_approval_by,
+                    LENGTH(page.page) - LENGTH(REPLACE(page.page, ':', '')) AS colons
+                    FROM page INNER JOIN revision ON page.page = revision.page
+                    WHERE page.hidden = 0 AND revision.current=1 AND page.page LIKE ? ESCAPE '_'
+                    ORDER BY colons, page.page";
+        $res = $sqlite->query($q, $params['namespace'].'%');
+        $pages = $sqlite->res2arr($res);
 
         // Output Table
         $renderer->doc .= '<table><tr>';
         $renderer->doc .= '<th>' . $this->getLang('hdr_page') . '</th>';
         $renderer->doc .= '<th>' . $this->getLang('hdr_state') . '</th>';
         $renderer->doc .= '<th>' . $this->getLang('hdr_updated') . '</th>';
+        $renderer->doc .= '<th>' . $this->getLang('hdr_maintainer') . '</th>';
         $renderer->doc .= '</tr>';
 
 
@@ -104,69 +111,96 @@ class syntax_plugin_approve_table extends DokuWiki_Syntax_Plugin {
         $all_approved_ready = 0;
         $all = 0;
 
-        $working_ns = null;
+        $curNS = '';
         foreach($pages as $page) {
-            // $page: 0 -> pagename, 1 -> true -> approved else false, 2 -> last changed date
-            $this_ns = getNS($page[0]);
+            $id = $page['page'];
+            $maintainer = $page['maintainer'];
+            $rev = $page['rev'];
+            $approved = strtotime($page['approved']);
+            $approved_by = $page['approved_by'];
+            $ready_for_approval = strtotime($page['ready_for_approval']);
+            $ready_for_approval_by = $page['ready_for_approval_by'];
 
-            if($this_ns != $working_ns) {
-                $name_ns = $this_ns;
-                if($this_ns == '') { $name_ns = 'root'; }
-                $renderer->doc .= '<tr><td colspan="3"><a href="';
-                $renderer->doc .= wl($this_ns . ':' . $this->getConf('start'));
+            $pageNS = getNS($id);
+
+            if($pageNS != '' && $pageNS != $curNS) {
+                $curNS = $pageNS;
+
+                $renderer->doc .= '<tr><td colspan="4"><a href="';
+                $renderer->doc .= wl($curNS);
                 $renderer->doc .= '">';
-                $renderer->doc .= $name_ns;
+                $renderer->doc .= $curNS;
                 $renderer->doc .= '</a> ';
                 $renderer->doc .= '</td></tr>';
-                $working_ns = $this_ns;
             }
 
-            $updated = '<a href="' . wl($page[0]) . '">' . dformat($page[2]) . '</a>';
-
-            $class = 'plugin__approve_red';
-            $state = $this->getLang('draft');
             $all += 1;
-
-            if ($page[1] === 'approved') {
+            if ($approved) {
                 $class = 'plugin__approve_green';
                 $state = $this->getLang('approved');
+                $date = $approved;
+                $by = $approved_by;
+
                 $all_approved += 1;
-            } elseif ($page[1] === 'ready for approval' && $this->getConf('ready_for_approval') === 1) {
+            } elseif ($this->getConf('ready_for_approval') && $ready_for_approval) {
                 $class = 'plugin__approve_ready';
                 $state = $this->getLang('marked_approve_ready');
+                $date = $ready_for_approval;
+                $by = $ready_for_approval_by;
+
                 $all_approved_ready += 1;
+            } else {
+                $class = 'plugin__approve_red';
+                $state = $this->getLang('draft');
+                $date = $rev;
+                $by = p_get_metadata($id, 'last_change user');
             }
 
             $renderer->doc .= '<tr class="'.$class.'">';
             $renderer->doc .= '<td><a href="';
-            $renderer->doc .= wl($page[0]);
+            $renderer->doc .= wl($id);
             $renderer->doc .= '">';
-            if ($conf['useheading'] === '1') {
-                $heading = p_get_first_heading($page[0]);
+            if ($conf['useheading'] == '1') {
+                $heading = p_get_first_heading($id);
                 if ($heading != '') {
                     $renderer->doc .= $heading;
                 } else {
-                    $renderer->doc .= $page[0];
+                    $renderer->doc .= $id;
                 }
-
             } else {
-                $renderer->doc .= $page[0];
+                $renderer->doc .= $id;
             }
 
             $renderer->doc .= '</a></td><td>';
-            $renderer->doc .= '<strong>'.$state. '</strong> '. $this->getLang('by'). ' ' . $page[4];
+            $renderer->doc .= '<strong>'.$state. '</strong> ';
+
+            $user = $auth->getUserData($by);
+            if ($user) {
+                $renderer->doc .= $this->getLang('by'). ' ' . $user['name'];
+            }
             $renderer->doc .= '</td><td>';
-            $renderer->doc .= $updated;
+            $renderer->doc .= '<a href="' . wl($id) . '">' . dformat($date) . '</a>';;
+            $renderer->doc .= '</td><td>';
+            if ($maintainer) {
+                $user = $auth->getUserData($maintainer);
+                if ($user) {
+                    $renderer->doc .= $user['name'];
+                } else {
+                    $renderer->doc .= $maintainer;
+                }
+            } else {
+                $renderer->doc .= '---';
+            }
             $renderer->doc .= '</td></tr>';
         }
 
         if ($params['summarize']) {
-            if($this->getConf('ready_for_approval') === 1) {
+            if($this->getConf('ready_for_approval')) {
                 $renderer->doc .= '<tr><td><strong>';
                 $renderer->doc .= $this->getLang('all_approved_ready');
                 $renderer->doc .= '</strong></td>';
 
-                $renderer->doc .= '<td colspan="2">';
+                $renderer->doc .= '<td colspan="3">';
                 $percent       = 0;
                 if($all > 0) {
                     $percent = $all_approved_ready * 100 / $all;
@@ -179,7 +213,7 @@ class syntax_plugin_approve_table extends DokuWiki_Syntax_Plugin {
             $renderer->doc .= $this->getLang('all_approved');
             $renderer->doc .= '</strong></td>';
 
-            $renderer->doc .= '<td colspan="2">';
+            $renderer->doc .= '<td colspan="3">';
             $percent       = 0;
             if($all > 0) {
                 $percent = $all_approved * 100 / $all;

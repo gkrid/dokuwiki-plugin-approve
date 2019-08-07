@@ -2,7 +2,7 @@
 
 Here you can define pages/namespaces where approve is used.
 Additionally you can specify page maintainers who will receive notifications
-about changes in maintained pages.
+about required approval in maintained pages. More precise rule obscures more general.
 
   * Namespaces excluding subnamespaces are assigned as ''<nowiki>namespace:*</nowiki>''.
   * Namespaces including subnamespaces are assigned as ''<nowiki>namespace:**</nowiki>''.

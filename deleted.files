@@ -4,3 +4,6 @@
 
 syntax.php
 style.css
+syntax/old.php
+meta/ApproveConst.php
+meta/PageSearch.php

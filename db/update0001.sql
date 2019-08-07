@@ -8,7 +8,9 @@ CREATE TABLE revision (
     page TEXT NOT NULL,
     rev INTEGER NOT NULL,
     ready_for_approval TEXT NULL,
+    ready_for_approval_by TEXT NULL,
     approved TEXT NULL,
+    approved_by TEXT NULL,
     version INTEGER NULL,
     current BOOLEAN NOT NULL DEFAULT 0,
     PRIMARY KEY (page, rev)

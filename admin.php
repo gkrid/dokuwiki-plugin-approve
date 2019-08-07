@@ -176,8 +176,6 @@ class admin_plugin_approve extends DokuWiki_Admin_Plugin
      */
     public function html()
     {
-        global $lang;
-
         global $ID;
         /* @var DokuWiki_Auth_Plugin $auth */
         global $auth;
@@ -218,7 +216,12 @@ class admin_plugin_approve extends DokuWiki_Admin_Plugin
 
             echo '<tr>';
             echo '<td>' . hsc($namespace) . '</td>';
-            echo '<td>' . hsc($maintainer) . '</td>';
+            $user = $auth->getUserData($maintainer);
+            if ($user) {
+                echo '<td>' . hsc($user['name']) . '</td>';
+            } else {
+                echo '<td>' . hsc($maintainer) . '</td>';
+            }
             echo '<td><a href="' . $link . '">'.$this->getLang('admin btn_delete').'</a></td>';
             echo '</tr>';
         }

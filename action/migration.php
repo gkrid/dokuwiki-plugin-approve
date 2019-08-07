@@ -119,6 +119,7 @@ class action_plugin_approve_migration extends DokuWiki_Action_Plugin
             return trim($namespace, ':');
         }, $no_apr_namespaces_list);
 
+
         foreach ($pages as $page) {
             //import historic data
             $versions = p_get_metadata($page, ApproveConst::METADATA_VERSIONS_KEY);
@@ -134,11 +135,13 @@ class action_plugin_approve_migration extends DokuWiki_Action_Plugin
             unset($versions[0]);
             unset($versions[$last_change_date]);
 
+            $revision_editors = $this->revision_editors($page);
             foreach ($versions as $rev => $version) {
                 $data = [
                     'page' => $page,
                     'rev' => $rev,
                     'approved' => date('c', $rev),
+                    'approved_by' => $revision_editors[$rev],
                     'version' => $version
                 ];
                 $sqlite->storeEntry('revision', $data);
@@ -146,6 +149,7 @@ class action_plugin_approve_migration extends DokuWiki_Action_Plugin
 
             //process current data
             $summary = p_get_metadata($page, 'last_change sum');
+            $user = p_get_metadata($page, 'last_change user');
             $data = [
                 'page' => $page,
                 'rev' => $last_change_date,
@@ -154,8 +158,10 @@ class action_plugin_approve_migration extends DokuWiki_Action_Plugin
             if ($this->getConf('ready_for_approval') &&
                 $summary == $this->getConf('sum ready for approval')) {
                 $data['ready_for_approval'] = date('c', $last_change_date);
+                $data['ready_for_approval_by'] = $user;
             } elseif($summary == $this->getConf('sum approved')) {
                 $data['approved'] = date('c', $last_change_date);
+                $data['approved_by'] = $user;
                 $data['version'] = $last_version;
             }
             $sqlite->storeEntry('revision', $data);
@@ -250,5 +256,32 @@ class action_plugin_approve_migration extends DokuWiki_Action_Plugin
         }
 
         return $count;
+    }
+
+    /**
+     * Calculate current version
+     *
+     * @param $id
+     * @return array
+     */
+    protected function revision_editors($id)
+    {
+        $currev = @filemtime(wikiFN($id));
+        $user = p_get_metadata($id, 'last_change user');
+
+        $revision_editors = array($currev => $user);
+
+        $changelog = new PageChangeLog($id);
+        $first = 0;
+        $num = 100;
+        while (count($revs = $changelog->getRevisions($first, $num)) > 0) {
+            foreach ($revs as $rev) {
+                $revInfo = $changelog->getRevisionInfo($rev);
+                $revision_editors[$rev] = $revInfo['user'];
+            }
+            $first += $num;
+        }
+
+        return $revision_editors;
     }
 }

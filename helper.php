@@ -51,15 +51,18 @@ class helper_plugin_approve extends DokuWiki_Plugin {
 
     /**
      * @param $id
+     * @param null $maintainer
      * @return bool
      */
-    public function use_approve_here($id) {
+    public function use_approve_here($id, &$maintainer=null) {
 
         //check if we should update no_apr_namespace
         $this->no_apr_namespace();
 
-        $res = $this->sqlite()->query('SELECT page FROM page WHERE page=? AND hidden=0', $id);
-        if ($this->sqlite()->res2single($res)) {
+        $res = $this->sqlite()->query('SELECT page, maintainer FROM page WHERE page=? AND hidden=0', $id);
+        $row = $this->sqlite()->res2row($res);
+        $maintainer = $row['maintainer'];
+        if ($row) {
             return true;
         }
         return false;

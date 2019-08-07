@@ -88,7 +88,7 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
 		global $INFO;
 
         if (!$this->helper()->use_approve_here($INFO['id'])) return;
-		
+
 		if ($event->data == 'show' && isset($_GET['approve']) &&
             auth_quickaclcheck($INFO['id']) >= AUTH_DELETE) {
 
@@ -100,20 +100,20 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
             }
 		    //approved IS NULL prevents from overriding already approved page
 		    $this->sqlite()->query('UPDATE revision
-		                    SET approved=?, version=?
+		                    SET approved=?, approved_by=?, version=?
                             WHERE page=? AND current=1 AND approved IS NULL',
-                            date('c'), $next_version, $INFO['id']);
+                            date('c'), $INFO['client'], $next_version, $INFO['id']);
 
 			header('Location: ' . wl($INFO['id']));
 		} elseif ($event->data == 'show' && isset($_GET['ready_for_approval']) &&
             auth_quickaclcheck($INFO['id']) >= AUTH_EDIT) {
 
-            $this->sqlite()->query('UPDATE revision SET ready_for_approval=?
+            $this->sqlite()->query('UPDATE revision SET ready_for_approval=?, ready_for_approval_by=?
                             WHERE page=? AND current=1 AND ready_for_approval IS NULL',
-                            date('c'), $INFO['id']);
+                            date('c'), $INFO['client'], $INFO['id']);
 
             header('Location: ' . wl($INFO['id']));
-		}		
+		}
 	}
 
     /**
@@ -126,7 +126,7 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
 
         if ($event->data != 'show') return;
         //apply only to current page
-        if (!$INFO['rev']) return;
+        if ($INFO['rev'] != 0) return;
         if (auth_quickaclcheck($INFO['id']) >= AUTH_EDIT) return;
         if (!$this->helper()->use_approve_here($INFO['id'])) return;
 
@@ -146,17 +146,20 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
      */
     public function handle_display_banner(Doku_Event $event) {
 		global $INFO;
+		/** @var DokuWiki_Auth_Plugin $auth */
+		global $auth;
 
         if ($event->data != 'show') return;
         if (!$INFO['exists']) return;
-        if (!$this->helper()->use_approve_here($INFO['id'])) return;
+        if (!$this->helper()->use_approve_here($INFO['id'], $maintainer)) return;
 
 //        $last_change_date = p_get_metadata($INFO['id'], 'last_change date');
         $last_change_date = @filemtime(wikiFN($INFO['id']));
         $rev = !$INFO['rev'] ? $last_change_date : $INFO['rev'];
 
 
-        $res = $this->sqlite()->query('SELECT ready_for_approval, approved, version
+        $res = $this->sqlite()->query('SELECT ready_for_approval, ready_for_approval_by, 
+                                        approved, approved_by, version
                                 FROM revision
                                 WHERE page=? AND rev=?', $INFO['id'], $rev);
 
@@ -177,12 +180,15 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
 
 		ptln('<div id="plugin__approve" class="' . implode(' ', $classes) . '">');
 
-		tpl_pageinfo();
-		ptln(' | ');
+//		tpl_pageinfo();
+//		ptln(' | ');
 
 		if ($approve['approved']) {
-			ptln('<strong>'.$this->getLang('approved').'</strong> ('
-                . $this->getLang('version') .  ': ' . $approve['version'] . ')');
+			ptln('<strong>'.$this->getLang('approved').'</strong>');
+            ptln(' ' . dformat(strtotime($approve['approved'])));
+            $user = $auth->getUserData($approve['approved_by']);
+            ptln(' ' . $this->getLang('by') . ' ' . $user['name']);
+            ptln(' (' . $this->getLang('version') .  ': ' . $approve['version'] . ')');
 
 			//not the newest page
 			if ($rev != $last_change_date) {
@@ -190,17 +196,18 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
                                 WHERE page=? AND approved IS NOT NULL
                                 ORDER BY rev DESC LIMIT 1', $INFO['id']);
 
-                $lastest_approve = $this->sqlite()->res_fetch_assoc($res);
+                $last_approve = $this->sqlite()->res_fetch_assoc($res);
 
 			    //we can see drafts
                 if (auth_quickaclcheck($INFO['id']) >= AUTH_EDIT) {
                     ptln('<a href="' . wl($INFO['id']) . '">');
-                    ptln($this->getLang($lastest_approve['current'] ? 'newest_approved' : 'newest_draft'));
+                    ptln($this->getLang($last_approve['current'] ? 'newest_approved' : 'newest_draft'));
                     ptln('</a>');
-                } else {
+                //we cannot see link to draft but there is some newer approved version
+                } elseif ($last_approve['rev'] != $rev) {
                     $urlParameters = [];
-                    if (!$lastest_approve['current']) {
-                        $urlParameters['rev'] = $lastest_approve['rev'];
+                    if (!$last_approve['current']) {
+                        $urlParameters['rev'] = $last_approve['rev'];
                     }
                     ptln('<a href="' . wl($INFO['id'], $urlParameters) . '">');
                     ptln($this->getLang('newest_approved'));
@@ -209,22 +216,25 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
             }
 
 		} else {
-			ptln('<span>'.$this->getLang('draft').'</span>');
-
-			if ($this->getConf('ready_for_approval') && $approve['ready_for_approval']) {
-				ptln('<span>| '.$this->getLang('marked_approve_ready').'</span>');
-			}
+		    if ($this->getConf('ready_for_approval') && $approve['ready_for_approval']) {
+				ptln('<strong>'.$this->getLang('marked_approve_ready').'</strong>');
+                ptln(' ' . dformat(strtotime($approve['ready_for_approval'])));
+                $user = $auth->getUserData($approve['ready_for_approval_by']);
+                ptln(' ' . $this->getLang('by') . ' ' . $user['name']);
+			} else {
+                ptln('<strong>'.$this->getLang('draft').'</strong>');
+            }
 
 
             $res = $this->sqlite()->query('SELECT rev, current FROM revision
                             WHERE page=? AND approved IS NOT NULL
                             ORDER BY rev DESC LIMIT 1', $INFO['id']);
 
-            $lastest_approve = $this->sqlite()->res_fetch_assoc($res);
+            $last_approve = $this->sqlite()->res_fetch_assoc($res);
 
 
             //not exists approve for current page
-			if (!$lastest_approve) {
+			if (!$last_approve) {
                 //not the newest page
                 if ($rev != $last_change_date) {
 				    ptln('<a href="'.wl($INFO['id']).'">');
@@ -233,8 +243,8 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
 				}
 			} else {
                 $urlParameters = [];
-                if (!$lastest_approve['current']) {
-                    $urlParameters['rev'] = $lastest_approve['rev'];
+                if (!$last_approve['current']) {
+                    $urlParameters['rev'] = $last_approve['rev'];
                 }
                 ptln('<a href="' . wl($INFO['id'], $urlParameters) . '">');
                 ptln($this->getLang('newest_approved'));
@@ -244,9 +254,10 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
 			//we are in current page
 			if ($rev == $last_change_date) {
 
+			    //compare with the last approved page or 0 if there is no approved versions
                 $last_approved_rev = 0;
-                if (isset($lastest_approve['rev'])) {
-                    $last_approved_rev = $lastest_approve['rev'];
+                if (isset($last_approve['rev'])) {
+                    $last_approved_rev = $last_approve['rev'];
                 }
 
                 if ($this->getConf('ready_for_approval') &&
@@ -274,9 +285,14 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
                     ptln($this->getLang('approve'));
                     ptln('</a>');
                 }
-
             }
 		}
+
+		if ($maintainer) {
+            $user = $auth->getUserData($maintainer);
+            ptln(' | ' . $this->getLang('maintainer') . ': ' . $user['name']);
+        }
+
 		ptln('</div>');
 	}
 
