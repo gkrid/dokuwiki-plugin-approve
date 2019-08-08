@@ -40,7 +40,7 @@ class syntax_plugin_approve_table extends DokuWiki_Syntax_Plugin {
             'filter' => false,
             'states' => $this->states,
             'summarize' => true,
-            'maintainer' => '%'
+            'maintainer' => null
         ];
 
         foreach ($lines as $line) {
@@ -125,6 +125,13 @@ class syntax_plugin_approve_table extends DokuWiki_Syntax_Plugin {
         $db_helper = plugin_load('helper', 'approve_db');
         $sqlite = $db_helper->getDB();
 
+        $maintainer_query = '';
+        $query_args = [$params['namespace'].'%'];
+        if ($params['maintainer']) {
+            $maintainer_query = "AND page.maintainer LIKE ?";
+            $query_args[] = $params['maintainer'];
+        }
+
         if ($params['maintainer'] == '$USER$') {
             $params['maintainer'] = $INFO['client'];
         }
@@ -134,9 +141,10 @@ class syntax_plugin_approve_table extends DokuWiki_Syntax_Plugin {
                     LENGTH(page.page) - LENGTH(REPLACE(page.page, ':', '')) AS colons
                     FROM page INNER JOIN revision ON page.page = revision.page
                     WHERE page.hidden = 0 AND revision.current=1 AND page.page LIKE ? ESCAPE '_'
-                            AND page.maintainer LIKE ?
+                            $maintainer_query
                     ORDER BY colons, page.page";
-        $res = $sqlite->query($q, $params['namespace'].'%', $params['maintainer']);
+
+        $res = $sqlite->query($q, $query_args);
         $pages = $sqlite->res2arr($res);
 
         // Output Table
