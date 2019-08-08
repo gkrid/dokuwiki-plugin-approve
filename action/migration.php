@@ -6,8 +6,6 @@
 
 // must be run within Dokuwiki
 
-use dokuwiki\plugin\approve\meta\ApproveConst;
-
 if (!defined('DOKU_INC')) die();
 
 /**
@@ -122,7 +120,7 @@ class action_plugin_approve_migration extends DokuWiki_Action_Plugin
 
         foreach ($pages as $page) {
             //import historic data
-            $versions = p_get_metadata($page, ApproveConst::METADATA_VERSIONS_KEY);
+            $versions = p_get_metadata($page, 'plugin_approve_versions');
             if (!$versions) {
                 $versions = $this->render_metadata_for_approved_page($page);
             }
