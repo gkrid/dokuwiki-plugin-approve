@@ -125,15 +125,15 @@ class syntax_plugin_approve_table extends DokuWiki_Syntax_Plugin {
         $db_helper = plugin_load('helper', 'approve_db');
         $sqlite = $db_helper->getDB();
 
+        if ($params['maintainer'] == '$USER$') {
+            $params['maintainer'] = $INFO['client'];
+        }
+
         $maintainer_query = '';
         $query_args = [$params['namespace'].'%'];
         if ($params['maintainer']) {
             $maintainer_query = "AND page.maintainer LIKE ?";
             $query_args[] = $params['maintainer'];
-        }
-
-        if ($params['maintainer'] == '$USER$') {
-            $params['maintainer'] = $INFO['client'];
         }
 
         $q = "SELECT page.page, page.maintainer, revision.rev, revision.approved, revision.approved_by,
