@@ -35,7 +35,14 @@ class syntax_plugin_approve_table extends DokuWiki_Syntax_Plugin {
         array_shift($lines);
         array_pop($lines);
 
-        $params = [];
+        $params = [
+            'namespace' => '',
+            'filter' => false,
+            'states' => $this->states,
+            'summarize' => true,
+            'maintainer' => '%'
+        ];
+
         foreach ($lines as $line) {
             $pair = explode(':', $line, 2);
             if (count($pair) < 2) {
@@ -68,34 +75,68 @@ class syntax_plugin_approve_table extends DokuWiki_Syntax_Plugin {
         return $params;
     }
 
-    function render($mode, Doku_Renderer $renderer, $params) {
+    /**
+     * Render xhtml output or metadata
+     *
+     * @param string        $mode     Renderer mode (supported modes: xhtml)
+     * @param Doku_Renderer $renderer The renderer
+     * @param array         $data     The data from the handler() function
+     *
+     * @return bool If rendering was successful.
+     */
+
+    public function render($mode, Doku_Renderer $renderer, $data)
+    {
+        $method = 'render' . ucfirst($mode);
+        if (method_exists($this, $method)) {
+            call_user_func([$this, $method], $renderer, $data);
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Render metadata
+     *
+     * @param Doku_Renderer $renderer The renderer
+     * @param array         $data     The data from the handler() function
+     */
+    public function renderMetadata(Doku_Renderer $renderer, $params)
+    {
+        $plugin_name = $this->getPluginName();
+        $renderer->meta['plugin'][$plugin_name] = [];
+
+        if ($params['maintainer'] == '$USER$') {
+            $renderer->meta['plugin'][$plugin_name]['dynamic_maintainer'] = true;
+        }
+
+        $renderer->meta['plugin'][$plugin_name]['approve_table'] = true;
+    }
+
+    public function renderXhtml(Doku_Renderer $renderer, $params)
+    {
+        global $INFO;
+
         global $conf;
         /** @var DokuWiki_Auth_Plugin $auth */
         global $auth;
-
-        if ($mode != 'xhtml') return false;
-        if ($params === false) return false;
 
         /** @var \helper_plugin_ireadit_db $db_helper */
         $db_helper = plugin_load('helper', 'approve_db');
         $sqlite = $db_helper->getDB();
 
-        $defaults = [
-            'namespace' => '',
-            'filter' => false,
-            'states' => $this->states,
-            'summarize' => true,
-        ];
-
-        $params = array_replace($defaults, $params);
+        if ($params['maintainer'] == '$USER$') {
+            $params['maintainer'] = $INFO['client'];
+        }
 
         $q = "SELECT page.page, page.maintainer, revision.rev, revision.approved, revision.approved_by,
                     revision.ready_for_approval, revision.ready_for_approval_by,
                     LENGTH(page.page) - LENGTH(REPLACE(page.page, ':', '')) AS colons
                     FROM page INNER JOIN revision ON page.page = revision.page
                     WHERE page.hidden = 0 AND revision.current=1 AND page.page LIKE ? ESCAPE '_'
+                            AND page.maintainer LIKE ?
                     ORDER BY colons, page.page";
-        $res = $sqlite->query($q, $params['namespace'].'%');
+        $res = $sqlite->query($q, $params['namespace'].'%', $params['maintainer']);
         $pages = $sqlite->res2arr($res);
 
         // Output Table
@@ -223,6 +264,5 @@ class syntax_plugin_approve_table extends DokuWiki_Syntax_Plugin {
         }
 
         $renderer->doc .= '</table>';
-        return true;
     }
 }

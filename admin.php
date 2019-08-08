@@ -77,66 +77,68 @@ class admin_plugin_approve extends DokuWiki_Admin_Plugin
 
     protected function updatePage()
     {
-        $res = $this->sqlite()->query('SELECT * FROM maintainer');
-        $assignments = $this->sqlite()->res2arr($res);
-
-        $weighted_assigments = [];
-        foreach ($assignments as $assignment) {
-            $ns = $assignment['namespace'];
-            //more general namespaces are overridden by more specific ones.
-            if (substr($ns, -1) == '*') {
-                $weight = substr_count($ns, ':');
-            } else {
-                $weight = PHP_INT_MAX;
-            }
-
-            $assignment['weight'] = $weight;
-            $weighted_assigments[] = $assignment;
-        }
-        array_multisort(array_column($weighted_assigments, 'weight'), $weighted_assigments);
-
-        $approvePages = [];
-        $wikiPages = $this->getPages();
-        foreach ($weighted_assigments as $assignment) {
-            $ns = ltrim($assignment['namespace'], ':');
-            $maintainer = $assignment['maintainer'];
-            if (substr($ns, -2) == '**') {
-                //remove '**'
-                $ns = substr($ns, 0, -2);
-                foreach ($wikiPages as $id) {
-                    if (substr($id, 0, strlen($ns)) == $ns) {
-                        $approvePages[$id] = $maintainer;
-                    }
-                }
-            } elseif (substr($ns, -1) == '*') {
-                //remove '*'
-                $ns = substr($ns, 0, -1);
-                foreach ($wikiPages as $id) {
-                    $noNS = substr($id, strlen($id));
-                    if (strpos($noNS, ':') === FALSE &&
-                        substr($id, 0, strlen($ns)) == $ns) {
-                        $approvePages[$id] = $maintainer;
-                    }
-                }
-            } else {
-                $approvePages[$ns] = $maintainer;
-            }
-        }
-
         //clean current settings
         $this->sqlite()->query('DELETE FROM page');
+
+        $wikiPages = $this->getPages();
         $no_apr_namespace = $this->helper()->no_apr_namespace();
-        foreach ($approvePages as $id => $maintainer) {
-            $in_hidden_namespace = $this->helper()->in_hidden_namespace($id, $no_apr_namespace);
-            $hidden = $in_hidden_namespace ? '1' : '0';
-            if (blank($maintainer)) {
-                $q = 'INSERT INTO page(page,hidden) VALUES (?,?)';
-                $this->sqlite()->query($q, $id, $hidden);
-            } else {
-                $q = 'INSERT INTO page(page,maintainer,hidden) VALUES (?,?,?)';
-                $this->sqlite()->query($q, $id, $maintainer, $hidden);
+        $weighted_assignments = $this->helper()->weighted_assignments();
+        foreach ($wikiPages as $id) {
+            if ($this->helper()->isPageAssigned($id, $maintainer, $weighted_assignments)) {
+                $data = [
+                    'page' => $id,
+                    'hidden' => $this->helper()->in_hidden_namespace($id, $no_apr_namespace) ? '1' : '0'
+                ];
+                if (!blank($maintainer)) {
+                    $data['maintainer'] = $maintainer;
+                }
+                $this->sqlite()->storeEntry('page', $data);
             }
         }
+
+//        $weighted_assignments = $this->helper()->weighted_assignments();
+//
+//        $approvePages = [];
+//        $wikiPages = $this->getPages();
+//        foreach ($weighted_assignments as $assignment) {
+//            $ns = ltrim($assignment['namespace'], ':');
+//            $maintainer = $assignment['maintainer'];
+//            if (substr($ns, -2) == '**') {
+//                //remove '**'
+//                $ns = substr($ns, 0, -2);
+//                foreach ($wikiPages as $id) {
+//                    if (substr($id, 0, strlen($ns)) == $ns) {
+//                        $approvePages[$id] = $maintainer;
+//                    }
+//                }
+//            } elseif (substr($ns, -1) == '*') {
+//                //remove '*'
+//                $ns = substr($ns, 0, -1);
+//                foreach ($wikiPages as $id) {
+//                    $noNS = substr($id, strlen($id));
+//                    if (strpos($noNS, ':') === FALSE &&
+//                        substr($id, 0, strlen($ns)) == $ns) {
+//                        $approvePages[$id] = $maintainer;
+//                    }
+//                }
+//            } else {
+//                $approvePages[$ns] = $maintainer;
+//            }
+//        }
+//
+//        //clean current settings
+//        $this->sqlite()->query('DELETE FROM page');
+//        $no_apr_namespace = $this->helper()->no_apr_namespace();
+//        foreach ($approvePages as $id => $maintainer) {
+//            $data = [
+//                'page' => $id,
+//                'hidden' => $this->helper()->in_hidden_namespace($id, $no_apr_namespace)
+//            ];
+//            if (!blank($maintainer)) {
+//                $data['maintainer'] = $maintainer;
+//            }
+//            $this->sqlite()->storeEntry('page', $data);
+//        }
 
     }
 
@@ -157,13 +159,14 @@ class admin_plugin_approve extends DokuWiki_Admin_Plugin
                 $this->sqlite()->query('DELETE FROM maintainer WHERE id=?', $assignment['id']);
                 $this->updatePage();
             } else if ($INPUT->str('action') === 'add' && !blank($assignment['assign'])) {
-                if (blank($assignment['maintainer'])) {
-                    $q = 'INSERT INTO maintainer(namespace) VALUES (?)';
-                    $this->sqlite()->query($q, $assignment['assign']);
-                } else {
-                    $q = 'INSERT INTO maintainer(namespace,maintainer) VALUES (?,?)';
-                    $this->sqlite()->query($q, $assignment['assign'], $assignment['maintainer']);
+                $data = [
+                    'namespace' => $assignment['assign']
+                ];
+                if (!blank($assignment['maintainer'])) {
+                    $data['maintainer'] = $assignment['maintainer'];
                 }
+                $this->sqlite()->storeEntry('maintainer', $data);
+
                 $this->updatePage();
             }
 

@@ -1,7 +1,5 @@
 <?php
 
-use dokuwiki\plugin\approve\meta\ApproveConst;
-
 if(!defined('DOKU_INC')) die();
 
 class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
@@ -294,7 +292,7 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
     /**
      * @return bool|string
      */
-    protected function prev_rev($id) {
+    protected function lastRevisionHasntApprovalData($id) {
         $res = $this->sqlite()->query('SELECT rev FROM revision
                                         WHERE page=?
                                           AND current=1
@@ -330,10 +328,10 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
                 $last_change_date = $event->data['newRevision'];
 
                 //if the current page has approved or ready_for_approval -- keep it
-                $prev_rev = $this->prev_rev($id);
-                if ($prev_rev) {
+                $rev = $this->lastRevisionHasntApprovalData($id);
+                if ($rev) {
                     $this->sqlite()->query('UPDATE revision SET rev=? WHERE page=? AND rev=?',
-                        $last_change_date, $id, $prev_rev);
+                        $last_change_date, $id, $rev);
 
                 } else {
                     //keep previous record
@@ -353,25 +351,28 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
                 $this->sqlite()->query('DELETE FROM page WHERE page=?', $id);
 
                 //delete revision if no information about approvals
-                $prev_rev = $this->prev_rev($id);
-                if ($prev_rev) {
-                    $this->sqlite()->query('DELETE FROM revision WHERE page=? AND rev=?',
-                        $id, $prev_rev);
+                $rev = $this->lastRevisionHasntApprovalData($id);
+                if ($rev) {
+                    $this->sqlite()->query('DELETE FROM revision WHERE page=? AND rev=?', $id, $rev);
                 } else {
-                    $this->sqlite()->query('UPDATE revision SET current=0 WHERE page=? AND rev=?',
-                        $id, $prev_rev);
+                    $this->sqlite()->query('UPDATE revision SET current=0 WHERE page=? AND current=1', $id);
                 }
 
                 break;
             case DOKU_CHANGE_TYPE_CREATE:
+                if ($this->helper()->isPageAssigned($id, $newMaintainer)) {
+                    $data = [
+                        'page' => $id,
+                        'hidden' => $this->helper()->in_hidden_namespace($id) ? '1' : '0'
+                    ];
+                    if (!blank($newMaintainer)) {
+                        $data['maintainer'] = $newMaintainer;
+                    }
+                    $this->sqlite()->storeEntry('page', $data);
+                }
+
+                //store revision
                 $last_change_date = $event->data['newRevision'];
-                $hidden = $this->helper()->in_hidden_namespace($id);
-
-                $this->sqlite()->storeEntry('page', [
-                    'page' => $id,
-                    'hidden' => $hidden
-                ]);
-
                 $this->sqlite()->storeEntry('revision', [
                     'page' => $id,
                     'rev' => $last_change_date,

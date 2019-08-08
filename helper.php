@@ -108,4 +108,65 @@ class helper_plugin_approve extends DokuWiki_Plugin {
         }
         return false;
     }
+
+    /**
+     * @return array
+     */
+    public function weighted_assignments() {
+        $res = $this->sqlite()->query('SELECT id,namespace,maintainer FROM maintainer');
+        $assignments = $this->sqlite()->res2arr($res);
+
+        $weighted_assignments = [];
+        foreach ($assignments as $assignment) {
+            $ns = $assignment['namespace'];
+            //more general namespaces are overridden by more specific ones.
+            if (substr($ns, -1) == '*') {
+                $weight = substr_count($ns, ':');
+            } else {
+                $weight = PHP_INT_MAX;
+            }
+
+            $assignment['weight'] = $weight;
+            $weighted_assignments[] = $assignment;
+        }
+        array_multisort(array_column($weighted_assignments, 'weight'), $weighted_assignments);
+
+        return $weighted_assignments;
+    }
+
+    /**
+     * @param $id
+     * @param null $pageMaintainer
+     * @return bool
+     */
+    public function isPageAssigned($id, &$pageMaintainer=null, $weighted_assignments=null) {
+        if (!$weighted_assignments) {
+            $weighted_assignments = $this->weighted_assignments();
+        }
+        foreach ($weighted_assignments as $assignment) {
+            $ns = ltrim($assignment['namespace'], ':');
+            $maintainer = $assignment['maintainer'];
+            if (substr($ns, -2) == '**') {
+                //remove '**'
+                $ns = substr($ns, 0, -2);
+                if (substr($id, 0, strlen($ns)) == $ns) {
+                    $newAssignment = true;
+                    $pageMaintainer = $maintainer;
+                }
+            } elseif (substr($ns, -1) == '*') {
+                //remove '*'
+                $ns = substr($ns, 0, -1);
+                $noNS = substr($id, strlen($id));
+                if (strpos($noNS, ':') === FALSE &&
+                    substr($id, 0, strlen($ns)) == $ns) {
+                    $newAssignment = true;
+                    $pageMaintainer = $maintainer;
+                }
+            } elseif($id == $ns) {
+                $newAssignment = true;
+                $pageMaintainer = $maintainer;
+            }
+        }
+        return $newAssignment;
+    }
 }
