@@ -41,23 +41,34 @@ jQuery(function() {
 
         var date = JSINFO['approve']['date'];
         var author = JSINFO['approve']['author'];
+        var maintainer = JSINFO['approve']['maintainer'];
 
-
-
-        if (status === 'Approved') {
+        if (status === 'approved') {
             var version = JSINFO['approve']['version'];
-            var cont =	lang['approved'] + ' (' + lang['version'] + ': ' + version + ')<br>' + author;
+            var status_html = lang['approved'] + ' (' + lang['version'] + ': ' + version + ')';
+        } else if (status === 'ready for approval') {
+            var status_html =	lang['marked_ready_for_approval'];
         } else {
-            var cont =	lang['draft'] + '<br>' + author;
+            var status_html =	lang['draft'];
         }
 
+        var author_html = '';
+        if (author) {
+            author_html = author+'<br>';
+        }
+
+        var maintainer_html = '';
+        if (maintainer) {
+            maintainer_html = JSINFO['approve']['lang']['maintainer'] + ': ' + maintainer + '<br>';
+        }
 
         cells.push(jQuery("<td>")
             .html('<p style="text-align:left">'+
-                cont+'<br>'+
+                status_html+'<br>'+
+                author_html+
                 date.replace(' ', '&nbsp;')+'<br>'+
-
-                '</p>'));
+                maintainer_html +
+            '</p>'));
 
 
         cells[0].css('width', '25%');

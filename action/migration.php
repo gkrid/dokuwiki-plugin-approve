@@ -89,7 +89,7 @@ class action_plugin_approve_migration extends DokuWiki_Action_Plugin
 
         $db->beginTransaction();
 
-        $apr_namespaces = preg_split('/\s+/', $this->getConf('apr_namespaces'),
+        $apr_namespaces = preg_split('/\s+/', $this->getConf('apr_namespaces', ''),
             -1,PREG_SPLIT_NO_EMPTY);
 
         if (!$apr_namespaces) {
@@ -107,7 +107,7 @@ class action_plugin_approve_migration extends DokuWiki_Action_Plugin
         }
 
         //store config
-        $no_apr_namespaces = $this->getConf('no_apr_namespaces');
+        $no_apr_namespaces = $this->getConf('no_apr_namespaces', '');
         $sqlite->storeEntry('config',[
             'key' => 'no_apr_namespaces',
             'value' => $no_apr_namespaces

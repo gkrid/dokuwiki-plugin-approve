@@ -146,8 +146,6 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
      */
     public function handle_display_banner(Doku_Event $event) {
 		global $INFO;
-		/** @var DokuWiki_Auth_Plugin $auth */
-		global $auth;
 
         if ($event->data != 'show') return;
         if (!$INFO['exists']) return;
@@ -186,8 +184,7 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
 		if ($approve['approved']) {
 			ptln('<strong>'.$this->getLang('approved').'</strong>');
             ptln(' ' . dformat(strtotime($approve['approved'])));
-            $user = $auth->getUserData($approve['approved_by']);
-            ptln(' ' . $this->getLang('by') . ' ' . $user['name']);
+            ptln(' ' . $this->getLang('by') . ' ' . userlink($approve['approved_by'], true));
             ptln(' (' . $this->getLang('version') .  ': ' . $approve['version'] . ')');
 
 			//not the newest page
@@ -219,8 +216,7 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
 		    if ($this->getConf('ready_for_approval') && $approve['ready_for_approval']) {
 				ptln('<strong>'.$this->getLang('marked_approve_ready').'</strong>');
                 ptln(' ' . dformat(strtotime($approve['ready_for_approval'])));
-                $user = $auth->getUserData($approve['ready_for_approval_by']);
-                ptln(' ' . $this->getLang('by') . ' ' . $user['name']);
+                ptln(' ' . $this->getLang('by') . ' ' . userlink($approve['ready_for_approval_by'], true));
 			} else {
                 ptln('<strong>'.$this->getLang('draft').'</strong>');
             }
@@ -289,8 +285,7 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
 		}
 
 		if ($maintainer) {
-            $user = $auth->getUserData($maintainer);
-            ptln(' | ' . $this->getLang('maintainer') . ': ' . $user['name']);
+            ptln(' | ' . $this->getLang('maintainer') . ': ' . userlink($maintainer, true));
         }
 
 		ptln('</div>');
