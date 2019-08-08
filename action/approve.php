@@ -1,135 +1,174 @@
 <?php
 
-use dokuwiki\plugin\approve\meta\ApproveConst;
-
 if(!defined('DOKU_INC')) die();
 
 class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
 
-    /** @var DokuWiki_PluginInterface */
-    protected $hlp;
+    /** @var helper_plugin_sqlite */
+    protected $sqlite;
 
-    function __construct(){
-        $this->hlp = plugin_load('helper', 'approve');
+    /** @var helper_plugin_approve */
+    protected $helper;
+
+    /**
+     * @return helper_plugin_sqlite
+     */
+    protected function sqlite() {
+        if (!$this->sqlite) {
+            /** @var helper_plugin_approve_db $db_helper */
+            $db_helper = plugin_load('helper', 'approve_db');
+            $this->sqlite = $db_helper->getDB();
+        }
+        return $this->sqlite;
     }
 
-    function register(Doku_Event_Handler $controller) {
-		
-        $controller->register_hook('ACTION_ACT_PREPROCESS', 'BEFORE', $this, 'handle_approve', array());
-        $controller->register_hook('ACTION_ACT_PREPROCESS', 'BEFORE', $this, 'handle_viewer', array());
-        $controller->register_hook('TPL_ACT_RENDER', 'AFTER', $this, 'handle_diff_accept', array());
-        $controller->register_hook('TPL_ACT_RENDER', 'BEFORE', $this, 'handle_display_banner', array());
-        $controller->register_hook('HTML_SHOWREV_OUTPUT', 'BEFORE', $this, 'handle_showrev', array());
-        // ensure a page revision is created when summary changes:
-        $controller->register_hook('COMMON_WIKIPAGE_SAVE', 'BEFORE', $this, 'handle_pagesave_before');
+    /**
+     * @return helper_plugin_approve
+     */
+    protected function helper() {
+        if (!$this->helper) {
+            $helper = plugin_load('helper', 'approve');
+            $this->helper = $helper;
+        }
+        return $this->helper;
+    }
+
+
+    /**
+     * @param Doku_Event_Handler $controller
+     */
+    public function register(Doku_Event_Handler $controller) {
+        $controller->register_hook('TPL_ACT_RENDER', 'AFTER', $this, 'handle_diff_accept');
+        $controller->register_hook('HTML_SHOWREV_OUTPUT', 'BEFORE', $this, 'handle_showrev');
+        $controller->register_hook('ACTION_ACT_PREPROCESS', 'BEFORE', $this, 'handle_approve');
+        $controller->register_hook('ACTION_ACT_PREPROCESS', 'BEFORE', $this, 'handle_viewer');
+        $controller->register_hook('TPL_ACT_RENDER', 'BEFORE', $this, 'handle_display_banner');
         $controller->register_hook('COMMON_WIKIPAGE_SAVE', 'AFTER', $this, 'handle_pagesave_after');
     }
-	
-	function handle_diff_accept(Doku_Event $event, $param) {
-		global $ID;
-		
-		if (!$this->hlp->use_approve_here($ID)) return;
-		
+
+    /**
+     * @param Doku_Event $event
+     */
+    public function handle_diff_accept(Doku_Event $event) {
+		global $INFO;
+
+		if (!$this->helper()->use_approve_here($INFO['id'])) return;
+
 		if ($event->data == 'diff' && isset($_GET['approve'])) {
-			ptln('<a href="'.DOKU_URL.'doku.php?id='.$_GET['id'].'&approve=approve">'.$this->getLang('approve').'</a>');
+		    $href = wl($INFO['id'], ['approve' => 'approve']);
+			ptln('<a href="' . $href . '">'.$this->getLang('approve').'</a>');
 		}
 
-        if ($event->data == 'diff' && isset($_GET['ready_for_approval']) && $this->getConf('ready_for_approval') === 1) {
-			ptln('<a href="'.DOKU_URL.'doku.php?id='.$_GET['id'].'&ready_for_approval=ready_for_approval">'.$this->getLang('approve_ready').'</a>');
+        if ($this->getConf('ready_for_approval') && $event->data == 'diff' && isset($_GET['ready_for_approval'])) {
+            $href = wl($INFO['id'], ['ready_for_approval' => 'ready_for_approval']);
+            ptln('<a href="' . $href . '">'.$this->getLang('approve').'</a>');
 		}
 	}
 
-	function handle_showrev(Doku_Event $event, $param) {
-		global $REV;
+    /**
+     * @param Doku_Event $event
+     */
+    public function handle_showrev(Doku_Event $event) {
+        global $INFO;
 
-		$last = $this->find_lastest_approved();
-		if ($last == $REV)
-			$event->preventDefault();
+        if (!$this->helper()->use_approve_here($INFO['id'])) return;
+
+        $last_approved_rev = $this->helper()->find_last_approved($INFO['id']);
+		if ($last_approved_rev == $INFO['rev']) {
+            $event->preventDefault();
+        }
 	}
 
-	function can_approve() {
-		global $ID;
-		return auth_quickaclcheck($ID) >= AUTH_DELETE;
+	/**
+     * @param Doku_Event $event
+     */
+    public function handle_approve(Doku_Event $event) {
+		global $INFO;
+
+        if (!$this->helper()->use_approve_here($INFO['id'])) return;
+
+		if ($event->data == 'show' && isset($_GET['approve']) &&
+            auth_quickaclcheck($INFO['id']) >= AUTH_DELETE) {
+
+		    $res = $this->sqlite()->query('SELECT MAX(version)+1 FROM revision
+                                            WHERE page=?', $INFO['id']);
+		    $next_version = $this->sqlite()->res2single($res);
+		    if (!$next_version) {
+                $next_version = 1;
+            }
+		    //approved IS NULL prevents from overriding already approved page
+		    $this->sqlite()->query('UPDATE revision
+		                    SET approved=?, approved_by=?, version=?
+                            WHERE page=? AND current=1 AND approved IS NULL',
+                            date('c'), $INFO['client'], $next_version, $INFO['id']);
+
+			header('Location: ' . wl($INFO['id']));
+		} elseif ($event->data == 'show' && isset($_GET['ready_for_approval']) &&
+            auth_quickaclcheck($INFO['id']) >= AUTH_EDIT) {
+
+            $this->sqlite()->query('UPDATE revision SET ready_for_approval=?, ready_for_approval_by=?
+                            WHERE page=? AND current=1 AND ready_for_approval IS NULL',
+                            date('c'), $INFO['client'], $INFO['id']);
+
+            header('Location: ' . wl($INFO['id']));
+		}
 	}
 
-    function can_edit() {
-		global $ID;
-		return auth_quickaclcheck($ID) >= AUTH_EDIT;
-	}
+    /**
+     * Redirect to newest approved page for user that don't have EDIT permission.
+     *
+     * @param Doku_Event $event
+     */
+    public function handle_viewer(Doku_Event $event) {
+        global $INFO;
 
-	function handle_approve(Doku_Event $event, $param) {
-		global $ID;
-		
-		if (!$this->hlp->use_approve_here($ID)) return;
-		
-		if ($event->data == 'show' && isset($_GET['approve'])) {
-		    if ( ! $this->can_approve()) return;
-
-		    //create new page revison
-            saveWikiText($ID, rawWiki($ID), $this->getConf('sum approved'));
-
-			header('Location: ?id='.$ID);
-		} elseif ($event->data == 'show' && isset($_GET['ready_for_approval'])) {
-		    if ( ! $this->can_edit()) return;
-
-            //create new page revison
-            saveWikiText($ID, rawWiki($ID), $this->getConf('sum ready for approval'));
-
-            header('Location: ?id='.$ID);
-		}		
-	}
-
-    function handle_viewer(Doku_Event $event, $param) {
-        global $REV, $ID;
         if ($event->data != 'show') return;
-        if (auth_quickaclcheck($ID) > AUTH_READ || !$this->hlp->use_approve_here($ID)) return;
-        
-	    $last = $this->find_lastest_approved();
-	    //no page is approved
-		if ($last == -1) return;
-		//approved page is the newest page
-		if ($last == 0) return;
-		
-		//if we are viewing lastest revision, show last approved
-		if ($REV == 0) header("Location: ?id=$ID&rev=$last");
+        //apply only to current page
+        if ($INFO['rev'] != 0) return;
+        if (auth_quickaclcheck($INFO['id']) >= AUTH_EDIT) return;
+        if (!$this->helper()->use_approve_here($INFO['id'])) return;
+
+        $last_approved_rev = $this->helper()->find_last_approved($INFO['id']);
+        //no page is approved
+        if (!$last_approved_rev) return;
+
+        $last_change_date = @filemtime(wikiFN($INFO['id']));
+        //current page is approved
+        if ($last_approved_rev == $last_change_date) return;
+
+	    header("Location: " . wl($INFO['id'], ['rev' => $last_approved_rev]));
 	}
 
-	function find_lastest_approved() {
-		global $ID;
-		$m = p_get_metadata($ID);
-		$sum = $m['last_change']['sum'];
-		if ($sum == $this->getConf('sum approved'))
-			return 0;
+    /**
+     * @param Doku_Event $event
+     */
+    public function handle_display_banner(Doku_Event $event) {
+		global $INFO;
 
-		$changelog = new PageChangeLog($ID);
-
-		$chs = $changelog->getRevisions(0, 10000);
-		foreach ($chs as $rev) {
-			$ch = $changelog->getRevisionInfo($rev);
-			if ($ch['sum'] == $this->getConf('sum approved'))
-				return $rev;
-		}
-		return -1;
-	}
-
-    function handle_display_banner(Doku_Event $event, $param) {
-		global $ID, $REV, $INFO;
-		
-		if (!$this->hlp->use_approve_here($ID)) return;
         if ($event->data != 'show') return;
-		if (!$INFO['exists']) return;
-		
-		$sum = $this->hlp->page_sum($ID, $REV);
+        if (!$INFO['exists']) return;
+        if (!$this->helper()->use_approve_here($INFO['id'], $maintainer)) return;
+
+//        $last_change_date = p_get_metadata($INFO['id'], 'last_change date');
+        $last_change_date = @filemtime(wikiFN($INFO['id']));
+        $rev = !$INFO['rev'] ? $last_change_date : $INFO['rev'];
 
 
-		$classes = array();
+        $res = $this->sqlite()->query('SELECT ready_for_approval, ready_for_approval_by, 
+                                        approved, approved_by, version
+                                FROM revision
+                                WHERE page=? AND rev=?', $INFO['id'], $rev);
+
+        $approve = $this->sqlite()->res_fetch_assoc($res);
+
+		$classes = [];
 		if ($this->getConf('prettyprint')) {
 		    $classes[] = 'plugin__approve_noprint';
         }
 
-        if ($sum == $this->getConf('sum approved')) {
+        if ($approve['approved']) {
 		    $classes[] = 'plugin__approve_green';
-		} elseif ($sum == $this->getConf('sum ready for approval') && $this->getConf('ready_for_approval')) {
+		} elseif ($this->getConf('ready_for_approval') && $approve['ready_for_approval']) {
 		    $classes[] = 'plugin__approve_ready';
         } else {
             $classes[] = 'plugin__approve_red';
@@ -137,174 +176,209 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
 
 		ptln('<div id="plugin__approve" class="' . implode(' ', $classes) . '">');
 
-		tpl_pageinfo();
-		ptln(' | ');
-		$last_approved_rev = $this->find_lastest_approved();
-		if ($sum == $this->getConf('sum approved')) {
-		    $versions = p_get_metadata($ID, ApproveConst::METADATA_VERSIONS_KEY);
-		    if (!$versions) {
-                $versions = $this->render_metadata_for_approved_page($ID);
-            }
-            if (empty($REV)) {
-                $version = $versions[0];
-            } else {
-                $version = $versions[$REV];
+//		tpl_pageinfo();
+//		ptln(' | ');
+
+		if ($approve['approved']) {
+			ptln('<strong>'.$this->getLang('approved').'</strong>');
+            ptln(' ' . dformat(strtotime($approve['approved'])));
+            ptln(' ' . $this->getLang('by') . ' ' . userlink($approve['approved_by'], true));
+            ptln(' (' . $this->getLang('version') .  ': ' . $approve['version'] . ')');
+
+			//not the newest page
+			if ($rev != $last_change_date) {
+                $res = $this->sqlite()->query('SELECT rev, current FROM revision
+                                WHERE page=? AND approved IS NOT NULL
+                                ORDER BY rev DESC LIMIT 1', $INFO['id']);
+
+                $last_approve = $this->sqlite()->res_fetch_assoc($res);
+
+			    //we can see drafts
+                if (auth_quickaclcheck($INFO['id']) >= AUTH_EDIT) {
+                    ptln('<a href="' . wl($INFO['id']) . '">');
+                    ptln($this->getLang($last_approve['current'] ? 'newest_approved' : 'newest_draft'));
+                    ptln('</a>');
+                //we cannot see link to draft but there is some newer approved version
+                } elseif ($last_approve['rev'] != $rev) {
+                    $urlParameters = [];
+                    if (!$last_approve['current']) {
+                        $urlParameters['rev'] = $last_approve['rev'];
+                    }
+                    ptln('<a href="' . wl($INFO['id'], $urlParameters) . '">');
+                    ptln($this->getLang('newest_approved'));
+                    ptln('</a>');
+                }
             }
 
-			ptln('<strong>'.$this->getLang('approved').'</strong> (' . $this->getLang('version') .  ': ' . $version
-                 . ')');
-			if ($REV != 0 && auth_quickaclcheck($ID) > AUTH_READ) {
-				ptln('<a href="'.wl($ID).'">');
-				ptln($this->getLang(p_get_metadata($ID, 'last_change sum') == $this->getConf('sum approved') ? 'newest_approved' : 'newest_draft'));
-				ptln('</a>');
-			} else if ($REV != 0 && $REV != $last_approved_rev) {
-				ptln('<a href="'.wl($ID).'">');
-				ptln($this->getLang('newest_approved'));
-				ptln('</a>');
-			}
 		} else {
-			ptln('<span>'.$this->getLang('draft').'</span>');
+		    if ($this->getConf('ready_for_approval') && $approve['ready_for_approval']) {
+				ptln('<strong>'.$this->getLang('marked_approve_ready').'</strong>');
+                ptln(' ' . dformat(strtotime($approve['ready_for_approval'])));
+                ptln(' ' . $this->getLang('by') . ' ' . userlink($approve['ready_for_approval_by'], true));
+			} else {
+                ptln('<strong>'.$this->getLang('draft').'</strong>');
+            }
 
-			if ($sum == $this->getConf('sum ready for approval') && $this->getConf('ready_for_approval') === 1) {
-				ptln('<span>| '.$this->getLang('marked_approve_ready').'</span>');
-			}
+
+            $res = $this->sqlite()->query('SELECT rev, current FROM revision
+                            WHERE page=? AND approved IS NOT NULL
+                            ORDER BY rev DESC LIMIT 1', $INFO['id']);
+
+            $last_approve = $this->sqlite()->res_fetch_assoc($res);
 
 
-			if ($last_approved_rev == -1) {
-			    if ($REV != 0) {
-				    ptln('<a href="'.wl($ID).'">');
-				    	ptln($this->getLang('newest_draft'));
+            //not exists approve for current page
+			if (!$last_approve) {
+                //not the newest page
+                if ($rev != $last_change_date) {
+				    ptln('<a href="'.wl($INFO['id']).'">');
+                    ptln($this->getLang('newest_draft'));
 				    ptln('</a>');
 				}
 			} else {
-				if ($last_approved_rev != 0)
-					ptln('<a href="'.wl($ID, array('rev' => $last_approved_rev)).'">');
-				else
-					ptln('<a href="'.wl($ID).'">');
-
-					ptln($this->getLang('newest_approved'));
+                $urlParameters = [];
+                if (!$last_approve['current']) {
+                    $urlParameters['rev'] = $last_approve['rev'];
+                }
+                ptln('<a href="' . wl($INFO['id'], $urlParameters) . '">');
+                ptln($this->getLang('newest_approved'));
 				ptln('</a>');
 			}
 
-			if ($REV == 0 && $this->can_edit() && $sum != $this->getConf('sum ready for approval') && $this->getConf('ready_for_approval') === 1) {
-				ptln(' | <a href="'.wl($ID, array('rev' => $last_approved_rev, 'do' => 'diff',
-				'ready_for_approval' => 'ready_for_approval')).'">');
-					ptln($this->getLang('approve_ready'));
-				ptln('</a>');
-			}
+			//we are in current page
+			if ($rev == $last_change_date) {
 
-			if ($REV == 0 && $this->can_approve()) {
-				ptln(' | <a href="'.wl($ID, array('rev' => $last_approved_rev, 'do' => 'diff',
-				'approve' => 'approve')).'">');
-					ptln($this->getLang('approve'));
-				ptln('</a>');
-			}
+			    //compare with the last approved page or 0 if there is no approved versions
+                $last_approved_rev = 0;
+                if (isset($last_approve['rev'])) {
+                    $last_approved_rev = $last_approve['rev'];
+                }
 
+                if ($this->getConf('ready_for_approval') &&
+                    auth_quickaclcheck($INFO['id']) >= AUTH_EDIT &&
+                    !$approve['ready_for_approval']) {
 
+                    $urlParameters = [
+                        'rev' => $last_approved_rev,
+                        'do' => 'diff',
+                        'ready_for_approval' => 'ready_for_approval'
+                    ];
+                    ptln(' | <a href="'.wl($INFO['id'], $urlParameters).'">');
+                    ptln($this->getLang('approve_ready'));
+                    ptln('</a>');
+                }
+
+                if (auth_quickaclcheck($INFO['id']) >= AUTH_DELETE) {
+
+                    $urlParameters = [
+                        'rev' => $last_approved_rev,
+                        'do' => 'diff',
+                        'approve' => 'approve'
+                    ];
+                    ptln(' | <a href="'.wl($INFO['id'], $urlParameters).'">');
+                    ptln($this->getLang('approve'));
+                    ptln('</a>');
+                }
+            }
 		}
+
+		if ($maintainer) {
+            ptln(' | ' . $this->getLang('maintainer') . ': ' . userlink($maintainer, true));
+        }
+
 		ptln('</div>');
 	}
 
     /**
-     * Check if the page has to be changed
+     * @return bool|string
+     */
+    protected function lastRevisionHasntApprovalData($id) {
+        $res = $this->sqlite()->query('SELECT rev FROM revision
+                                        WHERE page=?
+                                          AND current=1
+                                          AND approved IS NULL
+                                          AND ready_for_approval IS NULL', $id);
+
+        return $this->sqlite()->res2single($res);
+    }
+
+    /**
      *
      * @param Doku_Event $event  event object by reference
-     * @param mixed      $param  [the parameters passed as fifth argument to register_hook() when this
-     *                           handler was registered]
      * @return void
      */
-    public function handle_pagesave_before(Doku_Event $event, $param) {
-        global $REV;
-        $id = $event->data['id'];
-        if (!$this->hlp->use_approve_here($id)) return;
+    public function handle_pagesave_after(Doku_Event $event) {
+        //no content was changed
+        if (!$event->data['contentChanged']) return;
 
-        //save page if summary is provided
-        if($event->data['summary'] == $this->getConf('sum approved') ||
-            $event->data['summary'] == $this->getConf('sum ready for approval')) {
-            $event->data['contentChanged'] = true;
-        }
-    }
-
-    /**
-     * @param Doku_Event $event
-     * @param            $param
-     */
-    public function handle_pagesave_after(Doku_Event $event, $param) {
-        global $REV;
-        $id = $event->data['id'];
-        if (!$this->hlp->use_approve_here($id)) return;
-
-        //save page if summary is provided
-        if($event->data['summary'] == $this->getConf('sum approved')) {
-
-            $versions = p_get_metadata($id, ApproveConst::METADATA_VERSIONS_KEY);
-            //calculate versions
-            if (!$versions) {
-                $this->render_metadata_for_approved_page($id, $event->data['newRevision']);
+        $changeType = $event->data['changeType'];
+        if ($changeType == DOKU_CHANGE_TYPE_REVERT) {
+            if ($event->data['oldContent'] == '') {
+                $changeType = DOKU_CHANGE_TYPE_CREATE;
             } else {
-                $curver = $versions[0] + 1;
-                $versions[0] = $curver;
-                $versions[$event->data['newRevision']] = $curver;
-                p_set_metadata($id, array(ApproveConst::METADATA_VERSIONS_KEY => $versions));
+                $changeType = DOKU_CHANGE_TYPE_EDIT;
             }
         }
-    }
 
+        $id = $event->data['id'];
+        switch ($changeType) {
+            case DOKU_CHANGE_TYPE_EDIT:
+            case DOKU_CHANGE_TYPE_REVERT:
+            case DOKU_CHANGE_TYPE_MINOR_EDIT:
+                $last_change_date = $event->data['newRevision'];
 
-    /**
-     * Calculate current version
-     *
-     * @param $id
-     * @return array
-     */
-    protected function render_metadata_for_approved_page($id, $currev=false) {
-        if (!$currev) $currev = @filemtime(wikiFN($id));
+                //if the current page has approved or ready_for_approval -- keep it
+                $rev = $this->lastRevisionHasntApprovalData($id);
+                if ($rev) {
+                    $this->sqlite()->query('UPDATE revision SET rev=? WHERE page=? AND rev=?',
+                        $last_change_date, $id, $rev);
 
-        $version = $this->approved($id);
-        //version for current page
-        $curver = $version + 1;
-        $versions = array(0 => $curver, $currev => $curver);
+                } else {
+                    //keep previous record
+                    $this->sqlite()->query('UPDATE revision SET current=0
+                                            WHERE page=?
+                                            AND current=1', $id);
 
-        $changelog = new PageChangeLog($id);
-        $first = 0;
-        $num = 100;
-        while (count($revs = $changelog->getRevisions($first, $num)) > 0) {
-            foreach ($revs as $rev) {
-                $revInfo = $changelog->getRevisionInfo($rev);
-                if ($revInfo['sum'] == $this->getConf('sum approved')) {
-                    $versions[$rev] = $version;
-                    $version -= 1;
+                    $this->sqlite()->storeEntry('revision', [
+                        'page' => $id,
+                        'rev' => $last_change_date,
+                        'current' => 1
+                    ]);
                 }
-            }
-            $first += $num;
-        }
+                break;
+            case DOKU_CHANGE_TYPE_DELETE:
+                //delete information about availability of a page but keep the history
+                $this->sqlite()->query('DELETE FROM page WHERE page=?', $id);
 
-        p_set_metadata($id, array(ApproveConst::METADATA_VERSIONS_KEY => $versions));
-
-        return $versions;
-    }
-
-    /**
-     * Get the number of approved pages
-     * @param $id
-     * @return int
-     */
-    protected function approved($id) {
-        $count = 0;
-
-        $changelog = new PageChangeLog($id);
-        $first = 0;
-        $num = 100;
-        while (count($revs = $changelog->getRevisions($first, $num)) > 0) {
-            foreach ($revs as $rev) {
-                $revInfo = $changelog->getRevisionInfo($rev);
-                if ($revInfo['sum'] == $this->getConf('sum approved')) {
-                    $count += 1;
+                //delete revision if no information about approvals
+                $rev = $this->lastRevisionHasntApprovalData($id);
+                if ($rev) {
+                    $this->sqlite()->query('DELETE FROM revision WHERE page=? AND rev=?', $id, $rev);
+                } else {
+                    $this->sqlite()->query('UPDATE revision SET current=0 WHERE page=? AND current=1', $id);
                 }
-            }
-            $first += $num;
-        }
 
-        return $count;
+                break;
+            case DOKU_CHANGE_TYPE_CREATE:
+                if ($this->helper()->isPageAssigned($id, $newMaintainer)) {
+                    $data = [
+                        'page' => $id,
+                        'hidden' => $this->helper()->in_hidden_namespace($id) ? '1' : '0'
+                    ];
+                    if (!blank($newMaintainer)) {
+                        $data['maintainer'] = $newMaintainer;
+                    }
+                    $this->sqlite()->storeEntry('page', $data);
+                }
+
+                //store revision
+                $last_change_date = $event->data['newRevision'];
+                $this->sqlite()->storeEntry('revision', [
+                    'page' => $id,
+                    'rev' => $last_change_date,
+                    'current' => 1
+                ]);
+                break;
+        }
     }
 }
