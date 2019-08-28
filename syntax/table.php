@@ -7,12 +7,6 @@ if(!defined('DOKU_INC')) die();
 class syntax_plugin_approve_table extends DokuWiki_Syntax_Plugin {
 
     protected $states = ['approved', 'draft', 'ready for approval'];
-//
-//    public function __construct() {
-//        $this->states = [$this->getConf('sum approved'),
-//                         $this->getConf('sum ready for approval'),
-//                         $this->getConf('sum draft')];
-//    }
 
     function getType() {
         return 'substition';
@@ -62,9 +56,12 @@ class syntax_plugin_approve_table extends DokuWiki_Syntax_Plugin {
                         return false;
                     }
                 }
-            } elseif($key == 'filter' && preg_match($value, null) === false) {
-                msg('approve plugin: invalid filter regex', -1);
-                return false;
+            } elseif($key == 'filter') {
+                $value = trim($value, '/');
+                if (preg_match('/' . $value . '/', null) === false) {
+                    msg('approve plugin: invalid filter regex', -1);
+                    return false;
+                }
             } elseif ($key == 'summarize') {
                 $value = $value == '0' ? false : true;
             } elseif ($key == 'namespace') {
@@ -132,8 +129,12 @@ class syntax_plugin_approve_table extends DokuWiki_Syntax_Plugin {
         $maintainer_query = '';
         $query_args = [$params['namespace'].'%'];
         if ($params['maintainer']) {
-            $maintainer_query = "AND page.maintainer LIKE ?";
+            $maintainer_query .= " AND page.maintainer LIKE ?";
             $query_args[] = $params['maintainer'];
+        }
+        if ($params['filter']) {
+            $maintainer_query .= " AND page.page REGEXP ?";
+            $query_args[] = $params['filter'];
         }
 
         $q = "SELECT page.page, page.maintainer, revision.rev, revision.approved, revision.approved_by,
