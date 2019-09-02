@@ -61,7 +61,7 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
 
         if ($this->getConf('ready_for_approval') && $event->data == 'diff' && isset($_GET['ready_for_approval'])) {
             $href = wl($INFO['id'], ['ready_for_approval' => 'ready_for_approval']);
-            ptln('<a href="' . $href . '">'.$this->getLang('approve').'</a>');
+            ptln('<a href="' . $href . '">'.$this->getLang('approve_ready').'</a>');
 		}
 	}
 

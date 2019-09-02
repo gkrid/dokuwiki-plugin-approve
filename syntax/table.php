@@ -6,7 +6,7 @@ if(!defined('DOKU_INC')) die();
 
 class syntax_plugin_approve_table extends DokuWiki_Syntax_Plugin {
 
-    protected $states = ['approved', 'draft', 'ready for approval'];
+    protected $states = ['approved', 'draft', 'ready_for_approval'];
 
     function getType() {
         return 'substition';
@@ -32,7 +32,7 @@ class syntax_plugin_approve_table extends DokuWiki_Syntax_Plugin {
         $params = [
             'namespace' => '',
             'filter' => false,
-            'states' => $this->states,
+            'states' => [],
             'summarize' => true,
             'maintainer' => null
         ];
@@ -48,7 +48,6 @@ class syntax_plugin_approve_table extends DokuWiki_Syntax_Plugin {
                 $value = array_map('trim', explode(',', $value));
                 //normalize
                 $value = array_map('strtolower', $value);
-                $value = array_map('ucfirst', $value);
                 foreach ($value as $state) {
                     if (!in_array($state, $this->states)) {
                         msg('approve plugin: unknown state "'.$state.'" should be: ' .
@@ -110,6 +109,15 @@ class syntax_plugin_approve_table extends DokuWiki_Syntax_Plugin {
         $renderer->meta['plugin'][$plugin_name]['approve_table'] = true;
     }
 
+    protected function array_equal($a, $b) {
+        return (
+            is_array($a)
+            && is_array($b)
+            && count($a) == count($b)
+            && array_diff($a, $b) === array_diff($b, $a)
+        );
+    }
+
     public function renderXhtml(Doku_Renderer $renderer, $params)
     {
         global $INFO;
@@ -132,9 +140,27 @@ class syntax_plugin_approve_table extends DokuWiki_Syntax_Plugin {
             $maintainer_query .= " AND page.maintainer LIKE ?";
             $query_args[] = $params['maintainer'];
         }
+
         if ($params['filter']) {
             $maintainer_query .= " AND page.page REGEXP ?";
             $query_args[] = $params['filter'];
+        }
+
+        //if all 3 states are enabled nothing is filtered
+        if ($params['states'] && count($params['states']) < 3) {
+            if ($this->array_equal(['draft'], $params['states'])) {
+                $maintainer_query .= " AND revision.ready_for_approval IS NULL AND revision.approved IS NULL";
+            } elseif ($this->array_equal(['ready_for_approval'], $params['states'])) {
+                $maintainer_query .= " AND revision.ready_for_approval IS NOT NULL AND revision.approved IS NULL";
+            } elseif ($this->array_equal(['approved'], $params['states'])) {
+                $maintainer_query .= " AND revision.approved IS NOT NULL";
+            } elseif ($this->array_equal(['draft', 'ready_for_approval'], $params['states'])) {
+                $maintainer_query .= " AND revision.approved IS NULL";
+            } elseif ($this->array_equal(['draft', 'approved'], $params['states'])) {
+                $maintainer_query .= " AND (revision.approved IS NOT NULL OR (revision.approved IS NULL AND revision.ready_for_approval IS NULL))";
+            } elseif ($this->array_equal(['ready_for_approval', 'approved'], $params['states'])) {
+                $maintainer_query .= " AND (revision.ready_for_approval IS NOT NULL OR revision.approved IS NOT NULL)";
+            }
         }
 
         $q = "SELECT page.page, page.maintainer, revision.rev, revision.approved, revision.approved_by,
