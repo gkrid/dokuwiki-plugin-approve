@@ -1,7 +1,7 @@
 ====== Approve Assignments ======
 
 Tutaj możesz zdefiniować strony/przestrzenie nazw dla których wtyczka Approve będzie wykorzystywana.
-Dodatkowo możesz określić opiekunów poszczególnych stron, którzy będą otrzymywać powiadomienia na
+Dodatkowo możesz określić osoby zatwierdzające poszczególne strony, które będą otrzymywać powiadomienia na
 temat wymaganej akcji zatwierdzenia. Reguły bardziej szczegółowe przysłaniają te bardziej ogólne.
 
   * Przestrzenie nazw wyłączając podprzestrzenie są przypisywane jako ''<nowiki>namespace:*</nowiki>''.

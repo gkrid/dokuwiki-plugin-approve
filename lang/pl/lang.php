@@ -4,7 +4,7 @@ $lang['approve'] = 'Zatwierdź';
 $lang['approved'] = 'Zatwierdzona';
 $lang['approve_ready'] = 'Do zatwierdzenia';
 $lang['marked_approve_ready'] = 'Oznaczona do zatwierdzenia';
-$lang['maintainer'] = 'Opiekun';
+$lang['maintainer'] = 'Zatwierdzający';
 
 $lang['draft'] = 'Szkic';
 $lang['last_approved'] = 'Ostatnia zatwierdzona';
