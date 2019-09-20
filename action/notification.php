@@ -70,7 +70,7 @@ class action_plugin_approve_notification extends DokuWiki_Action_Plugin
             $link .= '</a>';
             $full = sprintf($this->getLang('notification full'), $link);
             $event->data['notifications'][] = [
-                'plugin' => 'ireadit',
+                'plugin' => 'approve',
                 'full' => $full,
                 'brief' => $link,
                 'timestamp' => (int)$rev

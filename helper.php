@@ -183,7 +183,8 @@ class helper_plugin_approve extends DokuWiki_Plugin {
         //no approver provided, check if approve plugin apply here
         if ($pageApprover == $INFO['client']) {
             return true;
-        } elseif(!$this->getConf('strict_approver') && auth_quickaclcheck($id) >= AUTH_DELETE) {
+        } elseif (auth_quickaclcheck($id) >= AUTH_DELETE &&
+            (!$pageApprover || !$this->getConf('strict_approver'))) {
             return true;
         }
 
@@ -202,7 +203,7 @@ class helper_plugin_approve extends DokuWiki_Plugin {
      * @param $id
      * @return bool
      */
-    public function client_can_see_drafts($id, $pageApprover=false) {
+    public function client_can_see_drafts($id, $pageApprover) {
         if (auth_quickaclcheck($id) >= AUTH_EDIT) return true;
         if ($this->client_can_approve($id, $pageApprover)) return true;
 
