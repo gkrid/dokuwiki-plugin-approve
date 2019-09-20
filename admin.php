@@ -138,7 +138,7 @@ class admin_plugin_approve extends DokuWiki_Admin_Plugin
         /* @var DokuWiki_Auth_Plugin $auth */
         global $auth;
 
-        $res = $this->sqlite()->query('SELECT * FROM maintainer');
+        $res = $this->sqlite()->query('SELECT * FROM maintainer ORDER BY namespace');
         $assignments = $this->sqlite()->res2arr($res);
 
         echo $this->locale_xhtml('assignments_intro');
