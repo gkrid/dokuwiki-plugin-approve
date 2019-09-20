@@ -46,7 +46,7 @@ class action_plugin_approve_notification extends DokuWiki_Action_Plugin
 
         $q = 'SELECT page.page, revision.rev
                     FROM page INNER JOIN revision ON page.page = revision.page
-                    WHERE page.hidden = 0 AND page.	maintainer=?
+                    WHERE page.hidden = 0 AND page.approver=?
                       AND revision.current=1 AND revision.approved IS NULL';
         $res = $sqlite->query($q, $user);
 

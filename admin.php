@@ -84,62 +84,17 @@ class admin_plugin_approve extends DokuWiki_Admin_Plugin
         $no_apr_namespace = $this->helper()->no_apr_namespace();
         $weighted_assignments = $this->helper()->weighted_assignments();
         foreach ($wikiPages as $id) {
-            if ($this->helper()->isPageAssigned($id, $maintainer, $weighted_assignments)) {
+            if ($this->helper()->isPageAssigned($id, $approver, $weighted_assignments)) {
                 $data = [
                     'page' => $id,
                     'hidden' => $this->helper()->in_hidden_namespace($id, $no_apr_namespace) ? '1' : '0'
                 ];
-                if (!blank($maintainer)) {
-                    $data['maintainer'] = $maintainer;
+                if (!blank($mapprover)) {
+                    $data['approver'] = $approver;
                 }
                 $this->sqlite()->storeEntry('page', $data);
             }
         }
-
-//        $weighted_assignments = $this->helper()->weighted_assignments();
-//
-//        $approvePages = [];
-//        $wikiPages = $this->getPages();
-//        foreach ($weighted_assignments as $assignment) {
-//            $ns = ltrim($assignment['namespace'], ':');
-//            $maintainer = $assignment['maintainer'];
-//            if (substr($ns, -2) == '**') {
-//                //remove '**'
-//                $ns = substr($ns, 0, -2);
-//                foreach ($wikiPages as $id) {
-//                    if (substr($id, 0, strlen($ns)) == $ns) {
-//                        $approvePages[$id] = $maintainer;
-//                    }
-//                }
-//            } elseif (substr($ns, -1) == '*') {
-//                //remove '*'
-//                $ns = substr($ns, 0, -1);
-//                foreach ($wikiPages as $id) {
-//                    $noNS = substr($id, strlen($id));
-//                    if (strpos($noNS, ':') === FALSE &&
-//                        substr($id, 0, strlen($ns)) == $ns) {
-//                        $approvePages[$id] = $maintainer;
-//                    }
-//                }
-//            } else {
-//                $approvePages[$ns] = $maintainer;
-//            }
-//        }
-//
-//        //clean current settings
-//        $this->sqlite()->query('DELETE FROM page');
-//        $no_apr_namespace = $this->helper()->no_apr_namespace();
-//        foreach ($approvePages as $id => $maintainer) {
-//            $data = [
-//                'page' => $id,
-//                'hidden' => $this->helper()->in_hidden_namespace($id, $no_apr_namespace)
-//            ];
-//            if (!blank($maintainer)) {
-//                $data['maintainer'] = $maintainer;
-//            }
-//            $this->sqlite()->storeEntry('page', $data);
-//        }
-
     }
 
     /**
@@ -162,10 +117,10 @@ class admin_plugin_approve extends DokuWiki_Admin_Plugin
                 $data = [
                     'namespace' => $assignment['assign']
                 ];
-                if (!blank($assignment['maintainer'])) {
-                    $data['maintainer'] = $assignment['maintainer'];
+                if (!blank($assignment['approver'])) {
+                    $data['approver'] = $assignment['approver'];
                 }
-                $this->sqlite()->storeEntry('maintainer', $data);
+                $this->sqlite()->storeEntry('approver', $data);
 
                 $this->updatePage();
             }
@@ -197,7 +152,7 @@ class admin_plugin_approve extends DokuWiki_Admin_Plugin
         // header
         echo '<tr>';
         echo '<th>'.$this->getLang('admin h_assignment_namespace').'</th>';
-        echo '<th>'.$this->getLang('admin h_assignment_maintainer').'</th>';
+        echo '<th>'.$this->getLang('admin h_assignment_approver').'</th>';
         echo '<th></th>';
         echo '</tr>';
 
@@ -205,7 +160,7 @@ class admin_plugin_approve extends DokuWiki_Admin_Plugin
         foreach($assignments as $assignment) {
             $id = $assignment['id'];
             $namespace = $assignment['namespace'];
-            $maintainer = $assignment['maintainer'] ? $assignment['maintainer'] : '---';
+            $approver = $assignment['approver'] ? $assignment['approver'] : '---';
 
             $link = wl(
                 $ID, array(
@@ -219,11 +174,11 @@ class admin_plugin_approve extends DokuWiki_Admin_Plugin
 
             echo '<tr>';
             echo '<td>' . hsc($namespace) . '</td>';
-            $user = $auth->getUserData($maintainer);
+            $user = $auth->getUserData($approver);
             if ($user) {
                 echo '<td>' . hsc($user['name']) . '</td>';
             } else {
-                echo '<td>' . hsc($maintainer) . '</td>';
+                echo '<td>' . hsc($approver) . '</td>';
             }
             echo '<td><a href="' . $link . '">'.$this->getLang('admin btn_delete').'</a></td>';
             echo '</tr>';
@@ -233,7 +188,7 @@ class admin_plugin_approve extends DokuWiki_Admin_Plugin
         echo '<tr>';
         echo '<td><input type="text" name="assignment[assign]" /></td>';
         echo '<td>';
-        echo '<select name="assignment[maintainer]">';
+        echo '<select name="assignment[approver]">';
         echo '<option value="">---</option>';
         foreach($auth->retrieveUsers() as $login => $data) {
             echo '<option value="' . hsc($login) . '">' . hsc($data['name']) . '</option>';

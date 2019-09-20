@@ -147,7 +147,7 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
 
         if ($event->data != 'show') return;
         if (!$INFO['exists']) return;
-        if (!$this->helper()->use_approve_here($INFO['id'], $maintainer)) return;
+        if (!$this->helper()->use_approve_here($INFO['id'], $approver)) return;
 
 //        $last_change_date = p_get_metadata($INFO['id'], 'last_change date');
         $last_change_date = @filemtime(wikiFN($INFO['id']));
@@ -282,8 +282,8 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
             }
 		}
 
-		if ($maintainer) {
-            ptln(' | ' . $this->getLang('maintainer') . ': ' . userlink($maintainer, true));
+		if ($approver) {
+            ptln(' | ' . $this->getLang('approver') . ': ' . userlink($approver, true));
         }
 
 		ptln('</div>');
@@ -360,13 +360,13 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
 
                 break;
             case DOKU_CHANGE_TYPE_CREATE:
-                if ($this->helper()->isPageAssigned($id, $newMaintainer)) {
+                if ($this->helper()->isPageAssigned($id, $newApprover)) {
                     $data = [
                         'page' => $id,
                         'hidden' => $this->helper()->in_hidden_namespace($id) ? '1' : '0'
                     ];
-                    if (!blank($newMaintainer)) {
-                        $data['maintainer'] = $newMaintainer;
+                    if (!blank($newApprover)) {
+                        $data['approver'] = $newApprover;
                     }
                     $this->sqlite()->storeEntry('page', $data);
                 }

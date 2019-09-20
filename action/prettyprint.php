@@ -42,7 +42,7 @@ class action_plugin_approve_prettyprint extends DokuWiki_Action_Plugin {
 		$JSINFO['approve'] = ['prettyprint' => false];
 
         if (!$this->getConf('prettyprint')) return;
-        if (!$this->helper()->use_approve_here($INFO['id'], $maintainer)) return;
+        if (!$this->helper()->use_approve_here($INFO['id'], $approver)) return;
 
 
         $JSINFO['approve']['prettyprint'] = true;
@@ -53,7 +53,7 @@ class action_plugin_approve_prettyprint extends DokuWiki_Action_Plugin {
 			'by' => $this->getLang('by'),
 			'date' => $this->getLang('hdr_updated'),
             'version' => $this->getLang('version'),
-            'maintainer' => $this->getLang('maintainer')
+            'approver' => $this->getLang('approver')
 		);
 
         $last_change_date = @filemtime(wikiFN($INFO['id']));
@@ -84,7 +84,7 @@ class action_plugin_approve_prettyprint extends DokuWiki_Action_Plugin {
             }
             $JSINFO['approve']['date'] = dformat($rev);
         }
-        $JSINFO['approve']['maintainer'] = userlink($maintainer, true);
+        $JSINFO['approve']['approver'] = userlink($approver, true);
 	}
 
 }

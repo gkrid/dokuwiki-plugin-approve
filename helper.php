@@ -51,17 +51,17 @@ class helper_plugin_approve extends DokuWiki_Plugin {
 
     /**
      * @param $id
-     * @param null $maintainer
+     * @param null $approver
      * @return bool
      */
-    public function use_approve_here($id, &$maintainer=null) {
+    public function use_approve_here($id, &$approver=null) {
 
         //check if we should update no_apr_namespace
         $this->no_apr_namespace();
 
-        $res = $this->sqlite()->query('SELECT page, maintainer FROM page WHERE page=? AND hidden=0', $id);
+        $res = $this->sqlite()->query('SELECT page, approver FROM page WHERE page=? AND hidden=0', $id);
         $row = $this->sqlite()->res2row($res);
-        $maintainer = $row['maintainer'];
+        $approver = $row['approver'];
         if ($row) {
             return true;
         }
@@ -113,7 +113,7 @@ class helper_plugin_approve extends DokuWiki_Plugin {
      * @return array
      */
     public function weighted_assignments() {
-        $res = $this->sqlite()->query('SELECT id,namespace,maintainer FROM maintainer');
+        $res = $this->sqlite()->query('SELECT id,namespace,approver FROM maintainer');
         $assignments = $this->sqlite()->res2arr($res);
 
         $weighted_assignments = [];
@@ -136,22 +136,22 @@ class helper_plugin_approve extends DokuWiki_Plugin {
 
     /**
      * @param $id
-     * @param null $pageMaintainer
+     * @param null $pageApprover
      * @return bool
      */
-    public function isPageAssigned($id, &$pageMaintainer=null, $weighted_assignments=null) {
+    public function isPageAssigned($id, &$pageApprover=null, $weighted_assignments=null) {
         if (!$weighted_assignments) {
             $weighted_assignments = $this->weighted_assignments();
         }
         foreach ($weighted_assignments as $assignment) {
             $ns = ltrim($assignment['namespace'], ':');
-            $maintainer = $assignment['maintainer'];
+            $approver = $assignment['approver'];
             if (substr($ns, -2) == '**') {
                 //remove '**'
                 $ns = substr($ns, 0, -2);
                 if (substr($id, 0, strlen($ns)) == $ns) {
                     $newAssignment = true;
-                    $pageMaintainer = $maintainer;
+                    $pageApprover = $approver;
                 }
             } elseif (substr($ns, -1) == '*') {
                 //remove '*'
@@ -160,11 +160,11 @@ class helper_plugin_approve extends DokuWiki_Plugin {
                 if (strpos($noNS, ':') === FALSE &&
                     substr($id, 0, strlen($ns)) == $ns) {
                     $newAssignment = true;
-                    $pageMaintainer = $maintainer;
+                    $pageApprover = $approver;
                 }
             } elseif($id == $ns) {
                 $newAssignment = true;
-                $pageMaintainer = $maintainer;
+                $pageApprover = $approver;
             }
         }
         return $newAssignment;

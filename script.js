@@ -41,7 +41,7 @@ jQuery(function() {
 
         var date = JSINFO['approve']['date'];
         var author = JSINFO['approve']['author'];
-        var maintainer = JSINFO['approve']['maintainer'];
+        var approver = JSINFO['approve']['approver'];
 
         if (status === 'approved') {
             var version = JSINFO['approve']['version'];
@@ -57,9 +57,9 @@ jQuery(function() {
             author_html = author+'<br>';
         }
 
-        var maintainer_html = '';
-        if (maintainer) {
-            maintainer_html = JSINFO['approve']['lang']['maintainer'] + ': ' + maintainer + '<br>';
+        var approver_html = '';
+        if (approver) {
+            approver_html = JSINFO['approve']['lang']['approver'] + ': ' + approver + '<br>';
         }
 
         cells.push(jQuery("<td>")
@@ -67,7 +67,7 @@ jQuery(function() {
                 status_html+'<br>'+
                 author_html+
                 date.replace(' ', '&nbsp;')+'<br>'+
-                maintainer_html +
+                approver_html +
             '</p>'));
 
 
