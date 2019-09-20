@@ -89,7 +89,7 @@ class admin_plugin_approve extends DokuWiki_Admin_Plugin
                     'page' => $id,
                     'hidden' => $this->helper()->in_hidden_namespace($id, $no_apr_namespace) ? '1' : '0'
                 ];
-                if (!blank($mapprover)) {
+                if (!blank($approver)) {
                     $data['approver'] = $approver;
                 }
                 $this->sqlite()->storeEntry('page', $data);
@@ -120,7 +120,7 @@ class admin_plugin_approve extends DokuWiki_Admin_Plugin
                 if (!blank($assignment['approver'])) {
                     $data['approver'] = $assignment['approver'];
                 }
-                $this->sqlite()->storeEntry('approver', $data);
+                $this->sqlite()->storeEntry('maintainer', $data);
 
                 $this->updatePage();
             }

@@ -41,6 +41,7 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
         $controller->register_hook('TPL_ACT_RENDER', 'AFTER', $this, 'handle_diff_accept');
         $controller->register_hook('HTML_SHOWREV_OUTPUT', 'BEFORE', $this, 'handle_showrev');
         $controller->register_hook('ACTION_ACT_PREPROCESS', 'BEFORE', $this, 'handle_approve');
+        $controller->register_hook('ACTION_ACT_PREPROCESS', 'BEFORE', $this, 'handle_mark_ready_for_approval');
         $controller->register_hook('ACTION_ACT_PREPROCESS', 'BEFORE', $this, 'handle_viewer');
         $controller->register_hook('TPL_ACT_RENDER', 'BEFORE', $this, 'handle_display_banner');
         $controller->register_hook('COMMON_WIKIPAGE_SAVE', 'AFTER', $this, 'handle_pagesave_after');
@@ -85,34 +86,43 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
     public function handle_approve(Doku_Event $event) {
 		global $INFO;
 
-        if (!$this->helper()->use_approve_here($INFO['id'])) return;
+        if ($event->data != 'show') return;
+        if (!isset($_GET['approve'])) return;
+        if (!$this->helper()->use_approve_here($INFO['id'], $approver)) return;
+        if (!$this->helper()->client_can_approve($INFO['id'], $approver)) return;
 
-		if ($event->data == 'show' && isset($_GET['approve']) &&
-            auth_quickaclcheck($INFO['id']) >= AUTH_DELETE) {
+        $res = $this->sqlite()->query('SELECT MAX(version)+1 FROM revision
+                                        WHERE page=?', $INFO['id']);
+        $next_version = $this->sqlite()->res2single($res);
+        if (!$next_version) {
+            $next_version = 1;
+        }
+        //approved IS NULL prevents from overriding already approved page
+        $this->sqlite()->query('UPDATE revision
+                        SET approved=?, approved_by=?, version=?
+                        WHERE page=? AND current=1 AND approved IS NULL',
+                        date('c'), $INFO['client'], $next_version, $INFO['id']);
 
-		    $res = $this->sqlite()->query('SELECT MAX(version)+1 FROM revision
-                                            WHERE page=?', $INFO['id']);
-		    $next_version = $this->sqlite()->res2single($res);
-		    if (!$next_version) {
-                $next_version = 1;
-            }
-		    //approved IS NULL prevents from overriding already approved page
-		    $this->sqlite()->query('UPDATE revision
-		                    SET approved=?, approved_by=?, version=?
-                            WHERE page=? AND current=1 AND approved IS NULL',
-                            date('c'), $INFO['client'], $next_version, $INFO['id']);
-
-			header('Location: ' . wl($INFO['id']));
-		} elseif ($event->data == 'show' && isset($_GET['ready_for_approval']) &&
-            auth_quickaclcheck($INFO['id']) >= AUTH_EDIT) {
-
-            $this->sqlite()->query('UPDATE revision SET ready_for_approval=?, ready_for_approval_by=?
-                            WHERE page=? AND current=1 AND ready_for_approval IS NULL',
-                            date('c'), $INFO['client'], $INFO['id']);
-
-            header('Location: ' . wl($INFO['id']));
-		}
+        header('Location: ' . wl($INFO['id']));
 	}
+
+    /**
+     * @param Doku_Event $event
+     */
+    public function handle_mark_ready_for_approval(Doku_Event $event) {
+        global $INFO;
+
+        if ($event->data != 'show') return;
+        if (!isset($_GET['ready_for_approval'])) return;
+        if (!$this->helper()->use_approve_here($INFO['id'])) return;
+        if (!$this->helper()->client_can_mark_ready_for_approval($INFO['id'])) return;
+
+        $this->sqlite()->query('UPDATE revision SET ready_for_approval=?, ready_for_approval_by=?
+                                WHERE page=? AND current=1 AND ready_for_approval IS NULL',
+        date('c'), $INFO['client'], $INFO['id']);
+
+        header('Location: ' . wl($INFO['id']));
+    }
 
     /**
      * Redirect to newest approved page for user that don't have EDIT permission.
@@ -125,8 +135,8 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
         if ($event->data != 'show') return;
         //apply only to current page
         if ($INFO['rev'] != 0) return;
-        if (auth_quickaclcheck($INFO['id']) >= AUTH_EDIT) return;
-        if (!$this->helper()->use_approve_here($INFO['id'])) return;
+        if (!$this->helper()->use_approve_here($INFO['id'], $approver)) return;
+        if ($this->helper()->client_can_see_drafts($INFO['id'], $approver)) return;
 
         $last_approved_rev = $this->helper()->find_last_approved($INFO['id']);
         //no page is approved
@@ -194,7 +204,7 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
                 $last_approve = $this->sqlite()->res_fetch_assoc($res);
 
 			    //we can see drafts
-                if (auth_quickaclcheck($INFO['id']) >= AUTH_EDIT) {
+                if ($this->helper()->client_can_see_drafts($INFO['id'], $approver)) {
                     ptln('<a href="' . wl($INFO['id']) . '">');
                     ptln($this->getLang($last_approve['current'] ? 'newest_approved' : 'newest_draft'));
                     ptln('</a>');
@@ -255,7 +265,7 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
                 }
 
                 if ($this->getConf('ready_for_approval') &&
-                    auth_quickaclcheck($INFO['id']) >= AUTH_EDIT &&
+                    $this->helper()->client_can_mark_ready_for_approval($INFO['id']) &&
                     !$approve['ready_for_approval']) {
 
                     $urlParameters = [
@@ -268,7 +278,7 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
                     ptln('</a>');
                 }
 
-                if (auth_quickaclcheck($INFO['id']) >= AUTH_DELETE) {
+                if ($this->helper()->client_can_approve($INFO['id'], $approver)) {
 
                     $urlParameters = [
                         'rev' => $last_approved_rev,

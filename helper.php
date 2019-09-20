@@ -169,4 +169,43 @@ class helper_plugin_approve extends DokuWiki_Plugin {
         }
         return $newAssignment;
     }
+
+    /**
+     * @param $id
+     * @param string $pageApprover
+     * @return bool
+     */
+    public function client_can_approve($id, $pageApprover) {
+        global $INFO;
+        //user not log in
+        if (!isset($INFO['userinfo'])) return false;
+
+        //no approver provided, check if approve plugin apply here
+        if ($pageApprover == $INFO['client']) {
+            return true;
+        } elseif(!$this->getConf('strict_approver') && auth_quickaclcheck($id) >= AUTH_DELETE) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * @param $id
+     * @return bool
+     */
+    public function client_can_mark_ready_for_approval($id) {
+        return auth_quickaclcheck($id) >= AUTH_EDIT;
+    }
+
+    /**
+     * @param $id
+     * @return bool
+     */
+    public function client_can_see_drafts($id, $pageApprover=false) {
+        if (auth_quickaclcheck($id) >= AUTH_EDIT) return true;
+        if ($this->client_can_approve($id, $pageApprover)) return true;
+
+        return false;
+    }
 }
