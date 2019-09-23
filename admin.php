@@ -188,13 +188,19 @@ class admin_plugin_approve extends DokuWiki_Admin_Plugin
         echo '<tr>';
         echo '<td><input type="text" name="assignment[assign]" /></td>';
         echo '<td>';
-        echo '<select name="assignment[approver]">';
-        echo '<option value="">---</option>';
-        foreach($auth->retrieveUsers() as $login => $data) {
-            echo '<option value="' . hsc($login) . '">' . hsc($data['name']) . '</option>';
+        if ($auth->canDo('getUsers')) {
+            echo '<select name="assignment[approver]">';
+            echo '<option value="">---</option>';
+            foreach($auth->retrieveUsers() as $login => $data) {
+                echo '<option value="' . hsc($login) . '">' . hsc($data['name']) . '</option>';
+            }
+            echo '</select>';
+
+        } else {
+            echo '<input name="assignment[approver]">';
         }
-        echo '</select>';
         echo '</td>';
+
         echo '<td><button type="submit" name="action" value="add">'.$this->getLang('admin btn_add').'</button></td>';
         echo '</tr>';
 
