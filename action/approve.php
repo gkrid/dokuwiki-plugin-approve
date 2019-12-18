@@ -146,7 +146,7 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
         //current page is approved
         if ($last_approved_rev == $last_change_date) return;
 
-	    header("Location: " . wl($INFO['id'], ['rev' => $last_approved_rev]));
+	    header("Location: " . wl($INFO['id'], ['rev' => $last_approved_rev], false, '&'));
 	}
 
     /**
@@ -164,7 +164,7 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
         $rev = !$INFO['rev'] ? $last_change_date : $INFO['rev'];
 
 
-        $res = $this->sqlite()->query('SELECT ready_for_approval, ready_for_approval_by, 
+        $res = $this->sqlite()->query('SELECT ready_for_approval, ready_for_approval_by,
                                         approved, approved_by, version
                                 FROM revision
                                 WHERE page=? AND rev=?', $INFO['id'], $rev);
