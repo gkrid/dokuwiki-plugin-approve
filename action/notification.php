@@ -56,7 +56,7 @@ class action_plugin_approve_notification extends DokuWiki_Action_Plugin
             $page = $notification['page'];
             $rev = $notification['rev'];
 
-            $link = '<a class="wikilink1" href="' . wl($page) . '">';
+            $link = '<a class="wikilink1" href="' . wl($page, '', true) . '">';
             if (useHeading('content')) {
                 $heading = p_get_first_heading($page);
                 if (!blank($heading)) {
@@ -71,6 +71,7 @@ class action_plugin_approve_notification extends DokuWiki_Action_Plugin
             $full = sprintf($this->getLang('notification full'), $link);
             $event->data['notifications'][] = [
                 'plugin' => 'approve',
+                'id' => $page.':'.$rev,
                 'full' => $full,
                 'brief' => $link,
                 'timestamp' => (int)$rev
