@@ -126,9 +126,14 @@ class syntax_plugin_approve_table extends DokuWiki_Syntax_Plugin {
         /** @var DokuWiki_Auth_Plugin $auth */
         global $auth;
 
-        /** @var \helper_plugin_ireadit_db $db_helper */
-        $db_helper = plugin_load('helper', 'approve_db');
-        $sqlite = $db_helper->getDB();
+        try {
+            /** @var \helper_plugin_approve_db $db_helper */
+            $db_helper = plugin_load('helper', 'approve_db');
+            $sqlite = $db_helper->getDB();
+        } catch (Exception $e) {
+            msg($e->getMessage(), -1);
+            return;
+        }
 
         if ($params['approver'] == '$USER$') {
             $params['approver'] = $INFO['client'];

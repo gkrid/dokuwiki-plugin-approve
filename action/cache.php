@@ -38,8 +38,15 @@ class action_plugin_approve_cache extends DokuWiki_Action_Plugin
         if ($approve['dynamic_approver']) {
             $cache->_nocache = true;
         } elseif ($approve['approve_table']) {
-            $db_helper = plugin_load('helper', 'approve_db');
-            $cache->depends['files'][] = $db_helper->getDB()->getAdapter()->getDbFile();
+            try {
+                /** @var \helper_plugin_approve_db $db_helper */
+                $db_helper = plugin_load('helper', 'approve_db');
+                $sqlite = $db_helper->getDB();
+                $cache->depends['files'][] = $sqlite->getAdapter()->getDbFile();
+            } catch (Exception $e) {
+                msg($e->getMessage(), -1);
+                return;
+            }
         }
     }
 }

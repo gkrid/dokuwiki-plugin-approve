@@ -6,21 +6,6 @@ if(!defined('DOKU_INC')) die();
 
 class action_plugin_approve_move extends DokuWiki_Action_Plugin {
 
-    /** @var helper_plugin_sqlite */
-    protected $sqlite;
-
-    /**
-     * @return helper_plugin_sqlite
-     */
-    protected function sqlite() {
-        if (!$this->sqlite) {
-            /** @var helper_plugin_approve_db $db_helper */
-            $db_helper = plugin_load('helper', 'approve_db');
-            $this->sqlite = $db_helper->getDB();
-        }
-        return $this->sqlite;
-    }
-
     /**
      * Registers a callback function for a given event
      *
@@ -36,14 +21,23 @@ class action_plugin_approve_move extends DokuWiki_Action_Plugin {
      *
      * @param Doku_Event $event event object by reference
      * @param bool $ispage is this a page move operation?
-     * @return bool
+     * @return void
      */
     public function handle_move(Doku_Event $event, $ispage) {
+        try {
+            /** @var \helper_plugin_approve_db $db_helper */
+            $db_helper = plugin_load('helper', 'approve_db');
+            $sqlite = $db_helper->getDB();
+        } catch (Exception $e) {
+            msg($e->getMessage(), -1);
+            return;
+        }
+
         $old = $event->data['src_id'];
         $new = $event->data['dst_id'];
 
         //move revision history
-        $this->sqlite()->query('UPDATE revision SET page=? WHERE page=?', $new, $old);
+        $sqlite->query('UPDATE revision SET page=? WHERE page=?', $new, $old);
     }
 
 }

@@ -3,37 +3,6 @@
 if(!defined('DOKU_INC')) die();
 
 class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
-
-    /** @var helper_plugin_sqlite */
-    protected $sqlite;
-
-    /** @var helper_plugin_approve */
-    protected $helper;
-
-    /**
-     * @return helper_plugin_sqlite
-     */
-    protected function sqlite() {
-        if (!$this->sqlite) {
-            /** @var helper_plugin_approve_db $db_helper */
-            $db_helper = plugin_load('helper', 'approve_db');
-            $this->sqlite = $db_helper->getDB();
-        }
-        return $this->sqlite;
-    }
-
-    /**
-     * @return helper_plugin_approve
-     */
-    protected function helper() {
-        if (!$this->helper) {
-            $helper = plugin_load('helper', 'approve');
-            $this->helper = $helper;
-        }
-        return $this->helper;
-    }
-
-
     /**
      * @param Doku_Event_Handler $controller
      */
@@ -53,7 +22,18 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
     public function handle_diff_accept(Doku_Event $event) {
 		global $INFO;
 
-		if (!$this->helper()->use_approve_here($INFO['id'])) return;
+        try {
+            /** @var \helper_plugin_approve_db $db_helper */
+            $db_helper = plugin_load('helper', 'approve_db');
+            $sqlite = $db_helper->getDB();
+        } catch (Exception $e) {
+            msg($e->getMessage(), -1);
+            return;
+        }
+        /** @var helper_plugin_approve $helper */
+        $helper = plugin_load('helper', 'approve');
+
+		if (!$helper->use_approve_here($sqlite, $INFO['id'])) return;
 
 		if ($event->data == 'diff' && isset($_GET['approve'])) {
 		    $href = wl($INFO['id'], ['approve' => 'approve']);
@@ -72,9 +52,20 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
     public function handle_showrev(Doku_Event $event) {
         global $INFO;
 
-        if (!$this->helper()->use_approve_here($INFO['id'])) return;
+        try {
+            /** @var \helper_plugin_approve_db $db_helper */
+            $db_helper = plugin_load('helper', 'approve_db');
+            $sqlite = $db_helper->getDB();
+        } catch (Exception $e) {
+            msg($e->getMessage(), -1);
+            return;
+        }
+        /** @var helper_plugin_approve $helper */
+        $helper = plugin_load('helper', 'approve');
 
-        $last_approved_rev = $this->helper()->find_last_approved($INFO['id']);
+        if (!$helper->use_approve_here($sqlite, $INFO['id'])) return;
+
+        $last_approved_rev = $helper->find_last_approved($sqlite, $INFO['id']);
 		if ($last_approved_rev == $INFO['rev']) {
             $event->preventDefault();
         }
@@ -86,19 +77,30 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
     public function handle_approve(Doku_Event $event) {
 		global $INFO;
 
+        try {
+            /** @var \helper_plugin_approve_db $db_helper */
+            $db_helper = plugin_load('helper', 'approve_db');
+            $sqlite = $db_helper->getDB();
+        } catch (Exception $e) {
+            msg($e->getMessage(), -1);
+            return;
+        }
+        /** @var helper_plugin_approve $helper */
+        $helper = plugin_load('helper', 'approve');
+
         if ($event->data != 'show') return;
         if (!isset($_GET['approve'])) return;
-        if (!$this->helper()->use_approve_here($INFO['id'], $approver)) return;
-        if (!$this->helper()->client_can_approve($INFO['id'], $approver)) return;
+        if (!$helper->use_approve_here($sqlite, $INFO['id'], $approver)) return;
+        if (!$helper->client_can_approve($INFO['id'], $approver)) return;
 
-        $res = $this->sqlite()->query('SELECT MAX(version)+1 FROM revision
+        $res = $sqlite->query('SELECT MAX(version)+1 FROM revision
                                         WHERE page=?', $INFO['id']);
-        $next_version = $this->sqlite()->res2single($res);
+        $next_version = $sqlite->res2single($res);
         if (!$next_version) {
             $next_version = 1;
         }
         //approved IS NULL prevents from overriding already approved page
-        $this->sqlite()->query('UPDATE revision
+        $sqlite->query('UPDATE revision
                         SET approved=?, approved_by=?, version=?
                         WHERE page=? AND current=1 AND approved IS NULL',
                         date('c'), $INFO['client'], $next_version, $INFO['id']);
@@ -112,12 +114,23 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
     public function handle_mark_ready_for_approval(Doku_Event $event) {
         global $INFO;
 
+        try {
+            /** @var \helper_plugin_approve_db $db_helper */
+            $db_helper = plugin_load('helper', 'approve_db');
+            $sqlite = $db_helper->getDB();
+        } catch (Exception $e) {
+            msg($e->getMessage(), -1);
+            return;
+        }
+        /** @var helper_plugin_approve $helper */
+        $helper = plugin_load('helper', 'approve');
+
         if ($event->data != 'show') return;
         if (!isset($_GET['ready_for_approval'])) return;
-        if (!$this->helper()->use_approve_here($INFO['id'])) return;
-        if (!$this->helper()->client_can_mark_ready_for_approval($INFO['id'])) return;
+        if (!$helper->use_approve_here($sqlite, $INFO['id'])) return;
+        if (!$helper->client_can_mark_ready_for_approval($INFO['id'])) return;
 
-        $this->sqlite()->query('UPDATE revision SET ready_for_approval=?, ready_for_approval_by=?
+        $sqlite->query('UPDATE revision SET ready_for_approval=?, ready_for_approval_by=?
                                 WHERE page=? AND current=1 AND ready_for_approval IS NULL',
         date('c'), $INFO['client'], $INFO['id']);
 
@@ -132,13 +145,24 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
     public function handle_viewer(Doku_Event $event) {
         global $INFO;
 
+        try {
+            /** @var \helper_plugin_approve_db $db_helper */
+            $db_helper = plugin_load('helper', 'approve_db');
+            $sqlite = $db_helper->getDB();
+        } catch (Exception $e) {
+            msg($e->getMessage(), -1);
+            return;
+        }
+        /** @var helper_plugin_approve $helper */
+        $helper = plugin_load('helper', 'approve');
+
         if ($event->data != 'show') return;
         //apply only to current page
         if ($INFO['rev'] != 0) return;
-        if (!$this->helper()->use_approve_here($INFO['id'], $approver)) return;
-        if ($this->helper()->client_can_see_drafts($INFO['id'], $approver)) return;
+        if (!$helper->use_approve_here($sqlite, $INFO['id'], $approver)) return;
+        if ($helper->client_can_see_drafts($INFO['id'], $approver)) return;
 
-        $last_approved_rev = $this->helper()->find_last_approved($INFO['id']);
+        $last_approved_rev = $helper->find_last_approved($sqlite, $INFO['id']);
         //no page is approved
         if (!$last_approved_rev) return;
 
@@ -155,21 +179,32 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
     public function handle_display_banner(Doku_Event $event) {
 		global $INFO;
 
+        try {
+            /** @var \helper_plugin_approve_db $db_helper */
+            $db_helper = plugin_load('helper', 'approve_db');
+            $sqlite = $db_helper->getDB();
+        } catch (Exception $e) {
+            msg($e->getMessage(), -1);
+            return;
+        }
+        /** @var helper_plugin_approve $helper */
+        $helper = plugin_load('helper', 'approve');
+
         if ($event->data != 'show') return;
         if (!$INFO['exists']) return;
-        if (!$this->helper()->use_approve_here($INFO['id'], $approver)) return;
+        if (!$helper->use_approve_here($sqlite, $INFO['id'], $approver)) return;
 
 //        $last_change_date = p_get_metadata($INFO['id'], 'last_change date');
         $last_change_date = @filemtime(wikiFN($INFO['id']));
         $rev = !$INFO['rev'] ? $last_change_date : $INFO['rev'];
 
 
-        $res = $this->sqlite()->query('SELECT ready_for_approval, ready_for_approval_by,
+        $res = $sqlite->query('SELECT ready_for_approval, ready_for_approval_by,
                                         approved, approved_by, version
                                 FROM revision
                                 WHERE page=? AND rev=?', $INFO['id'], $rev);
 
-        $approve = $this->sqlite()->res_fetch_assoc($res);
+        $approve = $sqlite->res_fetch_assoc($res);
 
 		$classes = [];
 		if ($this->getConf('prettyprint')) {
@@ -197,14 +232,14 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
 
 			//not the newest page
 			if ($rev != $last_change_date) {
-                $res = $this->sqlite()->query('SELECT rev, current FROM revision
+                $res = $sqlite->query('SELECT rev, current FROM revision
                                 WHERE page=? AND approved IS NOT NULL
                                 ORDER BY rev DESC LIMIT 1', $INFO['id']);
 
-                $last_approve = $this->sqlite()->res_fetch_assoc($res);
+                $last_approve = $sqlite->res_fetch_assoc($res);
 
 			    //we can see drafts
-                if ($this->helper()->client_can_see_drafts($INFO['id'], $approver)) {
+                if ($helper->client_can_see_drafts($INFO['id'], $approver)) {
                     ptln('<a href="' . wl($INFO['id']) . '">');
                     ptln($this->getLang($last_approve['current'] ? 'newest_approved' : 'newest_draft'));
                     ptln('</a>');
@@ -230,11 +265,11 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
             }
 
 
-            $res = $this->sqlite()->query('SELECT rev, current FROM revision
+            $res = $sqlite->query('SELECT rev, current FROM revision
                             WHERE page=? AND approved IS NOT NULL
                             ORDER BY rev DESC LIMIT 1', $INFO['id']);
 
-            $last_approve = $this->sqlite()->res_fetch_assoc($res);
+            $last_approve = $sqlite->res_fetch_assoc($res);
 
 
             //not exists approve for current page
@@ -265,7 +300,7 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
                 }
 
                 if ($this->getConf('ready_for_approval') &&
-                    $this->helper()->client_can_mark_ready_for_approval($INFO['id']) &&
+                    $helper->client_can_mark_ready_for_approval($INFO['id']) &&
                     !$approve['ready_for_approval']) {
 
                     $urlParameters = [
@@ -278,7 +313,7 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
                     ptln('</a>');
                 }
 
-                if ($this->helper()->client_can_approve($INFO['id'], $approver)) {
+                if ($helper->client_can_approve($INFO['id'], $approver)) {
 
                     $urlParameters = [
                         'rev' => $last_approved_rev,
@@ -300,16 +335,26 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
 	}
 
     /**
-     * @return bool|string
+     * @return bool|string|void
      */
     protected function lastRevisionHasntApprovalData($id) {
-        $res = $this->sqlite()->query('SELECT rev FROM revision
+
+        try {
+            /** @var \helper_plugin_approve_db $db_helper */
+            $db_helper = plugin_load('helper', 'approve_db');
+            $sqlite = $db_helper->getDB();
+        } catch (Exception $e) {
+            msg($e->getMessage(), -1);
+            return;
+        }
+
+        $res = $sqlite->query('SELECT rev FROM revision
                                         WHERE page=?
                                           AND current=1
                                           AND approved IS NULL
                                           AND ready_for_approval IS NULL', $id);
 
-        return $this->sqlite()->res2single($res);
+        return $sqlite->res2single($res);
     }
 
     /**
@@ -318,6 +363,17 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
      * @return void
      */
     public function handle_pagesave_after(Doku_Event $event) {
+        try {
+            /** @var \helper_plugin_approve_db $db_helper */
+            $db_helper = plugin_load('helper', 'approve_db');
+            $sqlite = $db_helper->getDB();
+        } catch (Exception $e) {
+            msg($e->getMessage(), -1);
+            return;
+        }
+        /** @var helper_plugin_approve $helper */
+        $helper = plugin_load('helper', 'approve');
+
         //no content was changed
         if (!$event->data['contentChanged']) return;
 
@@ -340,16 +396,16 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
                 //if the current page has approved or ready_for_approval -- keep it
                 $rev = $this->lastRevisionHasntApprovalData($id);
                 if ($rev) {
-                    $this->sqlite()->query('UPDATE revision SET rev=? WHERE page=? AND rev=?',
+                    $sqlite->query('UPDATE revision SET rev=? WHERE page=? AND rev=?',
                         $last_change_date, $id, $rev);
 
                 } else {
                     //keep previous record
-                    $this->sqlite()->query('UPDATE revision SET current=0
+                    $sqlite->query('UPDATE revision SET current=0
                                             WHERE page=?
                                             AND current=1', $id);
 
-                    $this->sqlite()->storeEntry('revision', [
+                    $sqlite->storeEntry('revision', [
                         'page' => $id,
                         'rev' => $last_change_date,
                         'current' => 1
@@ -358,32 +414,32 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
                 break;
             case DOKU_CHANGE_TYPE_DELETE:
                 //delete information about availability of a page but keep the history
-                $this->sqlite()->query('DELETE FROM page WHERE page=?', $id);
+                $sqlite->query('DELETE FROM page WHERE page=?', $id);
 
                 //delete revision if no information about approvals
                 $rev = $this->lastRevisionHasntApprovalData($id);
                 if ($rev) {
-                    $this->sqlite()->query('DELETE FROM revision WHERE page=? AND rev=?', $id, $rev);
+                    $sqlite->query('DELETE FROM revision WHERE page=? AND rev=?', $id, $rev);
                 } else {
-                    $this->sqlite()->query('UPDATE revision SET current=0 WHERE page=? AND current=1', $id);
+                    $sqlite->query('UPDATE revision SET current=0 WHERE page=? AND current=1', $id);
                 }
 
                 break;
             case DOKU_CHANGE_TYPE_CREATE:
-                if ($this->helper()->isPageAssigned($id, $newApprover)) {
+                if ($helper->isPageAssigned($sqlite, $id, $newApprover)) {
                     $data = [
                         'page' => $id,
-                        'hidden' => $this->helper()->in_hidden_namespace($id) ? '1' : '0'
+                        'hidden' => $helper->in_hidden_namespace($sqlite, $id) ? '1' : '0'
                     ];
                     if (!blank($newApprover)) {
                         $data['approver'] = $newApprover;
                     }
-                    $this->sqlite()->storeEntry('page', $data);
+                    $sqlite->storeEntry('page', $data);
                 }
 
                 //store revision
                 $last_change_date = $event->data['newRevision'];
-                $this->sqlite()->storeEntry('revision', [
+                $sqlite->storeEntry('revision', [
                     'page' => $id,
                     'rev' => $last_change_date,
                     'current' => 1

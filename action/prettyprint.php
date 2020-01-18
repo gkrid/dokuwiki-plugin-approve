@@ -4,45 +4,28 @@ if(!defined('DOKU_INC')) die();
 
 class action_plugin_approve_prettyprint extends DokuWiki_Action_Plugin {
 
-    /** @var helper_plugin_sqlite */
-    protected $sqlite;
-
-    /** @var helper_plugin_approve */
-    protected $helper;
-
-    /**
-     * @return helper_plugin_sqlite
-     */
-    protected function sqlite() {
-        if (!$this->sqlite) {
-            /** @var helper_plugin_approve_db $db_helper */
-            $db_helper = plugin_load('helper', 'approve_db');
-            $this->sqlite = $db_helper->getDB();
-        }
-        return $this->sqlite;
-    }
-
-    /**
-     * @return helper_plugin_approve
-     */
-    protected function helper() {
-        if (!$this->helper) {
-            $helper = plugin_load('helper', 'approve');
-            $this->helper = $helper;
-        }
-        return $this->helper;
-    }
-
 	function register(Doku_Event_Handler $controller) {
 		$controller->register_hook('DOKUWIKI_STARTED', 'AFTER',  $this, '_printingInfo');
 	}
 
 	function _printingInfo(Doku_Event $event, $param) {
 		global $JSINFO, $INFO;
+
+        try {
+            /** @var \helper_plugin_approve_db $db_helper */
+            $db_helper = plugin_load('helper', 'approve_db');
+            $sqlite = $db_helper->getDB();
+        } catch (Exception $e) {
+            msg($e->getMessage(), -1);
+            return;
+        }
+        /** @var helper_plugin_approve $helper */
+        $helper = plugin_load('helper', 'approve');
+
 		$JSINFO['approve'] = ['prettyprint' => false];
 
         if (!$this->getConf('prettyprint')) return;
-        if (!$this->helper()->use_approve_here($INFO['id'], $approver)) return;
+        if (!$helper->use_approve_here($sqlite, $INFO['id'], $approver)) return;
 
 
         $JSINFO['approve']['prettyprint'] = true;
@@ -59,12 +42,12 @@ class action_plugin_approve_prettyprint extends DokuWiki_Action_Plugin {
         $last_change_date = @filemtime(wikiFN($INFO['id']));
         $rev = !$INFO['rev'] ? $last_change_date : $INFO['rev'];
 
-        $res = $this->sqlite()->query('SELECT ready_for_approval, ready_for_approval_by, 
+        $res = $sqlite->query('SELECT ready_for_approval, ready_for_approval_by, 
                                         approved, approved_by, version
                                 FROM revision
                                 WHERE page=? AND rev=?', $INFO['id'], $rev);
 
-        $approve = $this->sqlite()->res_fetch_assoc($res);
+        $approve = $sqlite->res_fetch_assoc($res);
 
         if ($approve['approved']) {
             $JSINFO['approve']['status'] = 'approved';

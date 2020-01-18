@@ -61,18 +61,19 @@ class helper_plugin_approve_db extends DokuWiki_Plugin
     }
 
     /**
+     * @param bool $throw throw an Exception when sqlite not available?
      * @return helper_plugin_sqlite|null
+     * @throws Exception
      */
-    public function getDB()
+    public function getDB($throw=true)
     {
         global $conf;
         $len = strlen($conf['metadir']);
         if ($this->sqlite && $conf['metadir'] != substr($this->sqlite->getAdapter()->getDbFile(), 0, $len)) {
             $this->init();
         }
-        if (!$this->sqlite) {
-            msg($this->getLang('error sqlite missing'), -1);
-            return false;
+        if(!$this->sqlite && $throw) {
+            throw new \Exception('The approve plugin requires the sqlite plugin. Please install and enable it.');
         }
         return $this->sqlite;
     }

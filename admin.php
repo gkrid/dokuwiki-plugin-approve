@@ -13,36 +13,6 @@ if (!defined('DOKU_INC')) {
 
 class admin_plugin_approve extends DokuWiki_Admin_Plugin
 {
-
-    /** @var helper_plugin_sqlite */
-    protected $sqlite;
-
-    /** @var helper_plugin_approve */
-    protected $helper;
-
-    /**
-     * @return helper_plugin_sqlite
-     */
-    protected function sqlite() {
-        if (!$this->sqlite) {
-            /** @var helper_plugin_approve_db $db_helper */
-            $db_helper = plugin_load('helper', 'approve_db');
-            $this->sqlite = $db_helper->getDB();
-        }
-        return $this->sqlite;
-    }
-
-    /**
-     * @return helper_plugin_approve
-     */
-    protected function helper() {
-        if (!$this->helper) {
-            $helper = plugin_load('helper', 'approve');
-            $this->helper = $helper;
-        }
-        return $this->helper;
-    }
-
     /**
      * @return int sort number in admin menu
      */
@@ -75,24 +45,24 @@ class admin_plugin_approve extends DokuWiki_Admin_Plugin
         return $pages;
     }
 
-    protected function updatePage()
+    protected function updatePage(helper_plugin_sqlite $sqlite, helper_plugin_approve $helper)
     {
         //clean current settings
-        $this->sqlite()->query('DELETE FROM page');
+        $sqlite->query('DELETE FROM page');
 
         $wikiPages = $this->getPages();
-        $no_apr_namespace = $this->helper()->no_apr_namespace();
-        $weighted_assignments = $this->helper()->weighted_assignments();
+        $no_apr_namespace = $helper->no_apr_namespace($sqlite);
+        $weighted_assignments = $helper->weighted_assignments($sqlite);
         foreach ($wikiPages as $id) {
-            if ($this->helper()->isPageAssigned($id, $approver, $weighted_assignments)) {
+            if ($helper->isPageAssigned($sqlite, $id, $approver, $weighted_assignments)) {
                 $data = [
                     'page' => $id,
-                    'hidden' => $this->helper()->in_hidden_namespace($id, $no_apr_namespace) ? '1' : '0'
+                    'hidden' => $helper->in_hidden_namespace($sqlite, $id, $no_apr_namespace) ? '1' : '0'
                 ];
                 if (!blank($approver)) {
                     $data['approver'] = $approver;
                 }
-                $this->sqlite()->storeEntry('page', $data);
+                $sqlite->storeEntry('page', $data);
             }
         }
     }
@@ -103,16 +73,26 @@ class admin_plugin_approve extends DokuWiki_Admin_Plugin
     public function handle()
     {
         global $ID;
-
         /* @var Input */
         global $INPUT;
+
+        try {
+            /** @var \helper_plugin_approve_db $db_helper */
+            $db_helper = plugin_load('helper', 'approve_db');
+            $sqlite = $db_helper->getDB();
+        } catch (Exception $e) {
+            msg($e->getMessage(), -1);
+            return;
+        }
+        /** @var helper_plugin_approve $helper */
+        $helper = plugin_load('helper', 'approve');
 
         if($INPUT->str('action') && $INPUT->arr('assignment') && checkSecurityToken()) {
             $assignment = $INPUT->arr('assignment');
             //insert empty string as NULL
             if ($INPUT->str('action') === 'delete') {
-                $this->sqlite()->query('DELETE FROM maintainer WHERE id=?', $assignment['id']);
-                $this->updatePage();
+                $sqlite->query('DELETE FROM maintainer WHERE id=?', $assignment['id']);
+                $this->updatePage($sqlite, $helper);
             } else if ($INPUT->str('action') === 'add' && !blank($assignment['assign'])) {
                 $data = [
                     'namespace' => $assignment['assign']
@@ -120,9 +100,9 @@ class admin_plugin_approve extends DokuWiki_Admin_Plugin
                 if (!blank($assignment['approver'])) {
                     $data['approver'] = $assignment['approver'];
                 }
-                $this->sqlite()->storeEntry('maintainer', $data);
+                $sqlite->storeEntry('maintainer', $data);
 
-                $this->updatePage();
+                $this->updatePage($sqlite, $helper);
             }
 
             send_redirect(wl($ID, array('do' => 'admin', 'page' => 'approve'), true, '&'));
@@ -138,8 +118,17 @@ class admin_plugin_approve extends DokuWiki_Admin_Plugin
         /* @var DokuWiki_Auth_Plugin $auth */
         global $auth;
 
-        $res = $this->sqlite()->query('SELECT * FROM maintainer ORDER BY namespace');
-        $assignments = $this->sqlite()->res2arr($res);
+        try {
+            /** @var \helper_plugin_approve_db $db_helper */
+            $db_helper = plugin_load('helper', 'approve_db');
+            $sqlite = $db_helper->getDB();
+        } catch (Exception $e) {
+            msg($e->getMessage(), -1);
+            return;
+        }
+
+        $res = $sqlite->query('SELECT * FROM maintainer ORDER BY namespace');
+        $assignments = $sqlite->res2arr($res);
 
         echo $this->locale_xhtml('assignments_intro');
 

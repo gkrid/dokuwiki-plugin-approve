@@ -29,18 +29,29 @@ class action_plugin_approve_notification extends DokuWiki_Action_Plugin
     {
         if (!in_array('approve', $event->data['plugins'])) return;
 
-        /** @var \helper_plugin_ireadit_db $db_helper */
-        $db_helper = plugin_load('helper', 'approve_db');
-        $event->data['dependencies'][] = $db_helper->getDB()->getAdapter()->getDbFile();
+        try {
+            /** @var \helper_plugin_approve_db $db_helper */
+            $db_helper = plugin_load('helper', 'approve_db');
+            $sqlite = $db_helper->getDB();
+            $event->data['dependencies'][] = $sqlite->getAdapter()->getDbFile();
+        } catch (Exception $e) {
+            msg($e->getMessage(), -1);
+            return;
+        }
     }
 
     public function add_notifications(Doku_Event $event)
     {
         if (!in_array('approve', $event->data['plugins'])) return;
 
-        /** @var \helper_plugin_ireadit_db $db_helper */
-        $db_helper = plugin_load('helper', 'approve_db');
-        $sqlite = $db_helper->getDB();
+        try {
+            /** @var \helper_plugin_approve_db $db_helper */
+            $db_helper = plugin_load('helper', 'approve_db');
+            $sqlite = $db_helper->getDB();
+        } catch (Exception $e) {
+            msg($e->getMessage(), -1);
+            return;
+        }
 
         $user = $event->data['user'];
 
