@@ -168,6 +168,27 @@ class helper_plugin_approve extends DokuWiki_Plugin {
     }
 
     /**
+     * @param string $approver
+     * @return bool
+     */
+    public function isGroup($approver) {
+	if (!$approver) return false;
+        if (strncmp($approver, "@", 1) === 0) return true;
+        return false;
+    }
+
+    /**
+     * @param $userinfo
+     * @param string $group
+     * @return bool
+     */
+    public function isInGroup($userinfo, $group) {
+        $groupname = substr($group, 1);
+        if (in_array($groupname, $userinfo['grps'])) return true;
+        return false;
+    }
+
+    /**
      * @param $id
      * @param string $pageApprover
      * @return bool
@@ -177,9 +198,11 @@ class helper_plugin_approve extends DokuWiki_Plugin {
         //user not log in
         if (!isset($INFO['userinfo'])) return false;
 
-        //no approver provided, check if approve plugin apply here
         if ($pageApprover == $INFO['client']) {
             return true;
+        } elseif ($this->isGroup($pageApprover) && $this->isInGroup($INFO['userinfo'], $pageApprover)) {
+            return true;
+        //no approver provided, check if approve plugin apply here
         } elseif (auth_quickaclcheck($id) >= AUTH_DELETE &&
             (!$pageApprover || !$this->getConf('strict_approver'))) {
             return true;
