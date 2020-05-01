@@ -83,6 +83,7 @@ class action_plugin_approve_migration extends DokuWiki_Action_Plugin
             //remove start path and extension
             $page = substr($file->getPathname(), strlen($datadir), -4);
             $pages[] = str_replace('/', ':', $page);
+			$pages[] = str_replace('\\', ':', $page);
         }
 
         $db->beginTransaction();

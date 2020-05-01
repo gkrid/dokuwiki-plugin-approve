@@ -39,6 +39,7 @@ class admin_plugin_approve extends DokuWiki_Admin_Plugin
             $path = $fileinfo->getPathname();
             //remove .txt
             $id = str_replace('/', ':', substr($path, strlen($datadir), -4));
+            $id = str_replace('\\', ':', substr($path, strlen($datadir), -4));
             $pages[] = $id;
         }
 
