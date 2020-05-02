@@ -208,4 +208,32 @@ class helper_plugin_approve extends DokuWiki_Plugin {
 
         return false;
     }
+
+    /**
+     * Get the array of all pages ids in wiki
+     *
+     * @return array
+     */
+    public function getPages() {
+        global $conf;
+
+        $datadir = realpath($conf['datadir']);  // path without ending "/"
+        $directory = new RecursiveDirectoryIterator($datadir, FilesystemIterator::SKIP_DOTS);
+        $iterator = new RecursiveIteratorIterator($directory);
+
+        $pages = [];
+        /** @var SplFileInfo $fileinfo */
+        foreach ($iterator as $fileinfo) {
+            if (!$fileinfo->isFile()) continue;
+
+            $path = $fileinfo->getRealPath(); // it should return "/" both on windows and linux
+            //remove dir part
+            $path = substr($path, strlen($datadir));
+            //make file a dokuwiki path
+            $id = pathID($path);
+            $pages[] = $id;
+        }
+
+        return $pages;
+    }
 }

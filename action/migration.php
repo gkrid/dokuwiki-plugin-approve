@@ -61,30 +61,12 @@ class action_plugin_approve_migration extends DokuWiki_Action_Plugin
 
     protected function migration1($data)
     {
-        global $conf;
-
         /** @var helper_plugin_sqlite $sqlite */
         $sqlite = $data['sqlite'];
         $db = $sqlite->getAdapter()->getDb();
 
-
-        $datadir = $conf['datadir'];
-        if (substr($datadir, -1) != '/') {
-            $datadir .= '/';
-        }
-
-        $rii = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($datadir));
-        $pages = [];
-        foreach ($rii as $file) {
-            if ($file->isDir()){
-                continue;
-            }
-
-            //remove start path and extension
-            $page = substr($file->getPathname(), strlen($datadir), -4);
-            $pages[] = str_replace('/', ':', $page);
-			$pages[] = str_replace('\\', ':', $page);
-        }
+        /** @var helper_plugin_approve $helper */
+        $helper = plugin_load('helper', 'approve');
 
         $db->beginTransaction();
 
@@ -119,6 +101,7 @@ class action_plugin_approve_migration extends DokuWiki_Action_Plugin
         }, $no_apr_namespaces_list);
 
 
+        $pages = $helper->getPages();
         foreach ($pages as $page) {
             //import historic data
             $versions = p_get_metadata($page, 'plugin_approve_versions');
