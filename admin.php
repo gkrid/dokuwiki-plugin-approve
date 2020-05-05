@@ -55,14 +55,16 @@ class admin_plugin_approve extends DokuWiki_Admin_Plugin
         $weighted_assignments = $helper->weighted_assignments($sqlite);
         foreach ($wikiPages as $id) {
             if ($helper->isPageAssigned($sqlite, $id, $approver, $weighted_assignments)) {
-                $data = [
-                    'page' => $id,
-                    'hidden' => $helper->in_hidden_namespace($sqlite, $id, $no_apr_namespace) ? '1' : '0'
-                ];
-                if (!blank($approver)) {
-                    $data['approver'] = $approver;
+                foreach ($approver as $ap) {
+                    $data = [
+                        'page' => $id,
+                        'hidden' => $helper->in_hidden_namespace($sqlite, $id, $no_apr_namespace) ? '1' : '0'
+                    ];
+                    if (!blank($ap)) {
+                        $data['approver'] = $ap;
+                    }
+                    $sqlite->storeEntry('page', $data);
                 }
-                $sqlite->storeEntry('page', $data);
             }
         }
     }
