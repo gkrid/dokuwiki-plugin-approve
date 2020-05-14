@@ -33,3 +33,5 @@ $lang['admin h_assignment_namespace'] = 'Strona/Przestrzeń nazw';
 $lang['admin h_assignment_approver'] = $lang['approver'];
 
 $lang['notification full'] = 'Masz stronę do zatwierdzenia: %s';
+
+$lang['js']['group_option_label'] = 'Grupa:';
