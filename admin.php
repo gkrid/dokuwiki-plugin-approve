@@ -193,7 +193,9 @@ class admin_plugin_approve extends DokuWiki_Admin_Plugin
             echo '</select>';
             // in case your auth plugin can do groups, but not list them (like the default one),
             // leave a text field as backup
-            echo '<input name="assignment[approver_fb]">';
+            if (!$auth->canDo('getGroups')) {
+                echo '<input name="assignment[approver_fb]" id="plugin__approve_group_input">';
+            }
         } else {
             echo '<input name="assignment[approver]">';
         }
