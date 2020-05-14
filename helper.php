@@ -230,10 +230,28 @@ class helper_plugin_approve extends DokuWiki_Plugin {
             //remove dir part
             $path = substr($path, strlen($datadir));
             //make file a dokuwiki path
-            $id = pathID($path);
+            $id = $this->pathID($path);
             $pages[] = $id;
         }
 
         return $pages;
+    }
+
+    /**
+     * translates a document path to an ID
+     *
+     * fixes dokuwiki pathID - support for Windows enviroment
+     *
+     * @param string $path
+     * @param bool $keeptxt
+     *
+     * @return mixed|string
+     */
+    public function pathID($path,$keeptxt=false){
+        $id = utf8_decodeFN($path);
+        $id = str_replace(DIRECTORY_SEPARATOR,':',$id);
+        if(!$keeptxt) $id = preg_replace('#\.txt$#','',$id);
+        $id = trim($id, ':');
+        return $id;
     }
 }
