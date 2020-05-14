@@ -7,3 +7,5 @@ Reguły bardziej szczegółowe przysłaniają te bardziej ogólne.
   * Przestrzenie nazw wyłączając podprzestrzenie są przypisywane jako ''<nowiki>namespace:*</nowiki>''.
   * Przestrzenie nazw włączając podprzestrzenie są przypisywane jako ''<nowiki>namespace:**</nowiki>''.
   * Strony muszą posiadać pełne ID.
+
+Grupy mogą być przypiswane jako zatwierdzający poprzez poprzedzenie znakiem "@".

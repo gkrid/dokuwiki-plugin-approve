@@ -99,6 +99,8 @@ class admin_plugin_approve extends DokuWiki_Admin_Plugin
                 ];
                 if (!blank($assignment['approver'])) {
                     $data['approver'] = $assignment['approver'];
+                } else if (!blank($assignment['approver_fb'])) {
+                    $data['approver'] = $assignment['approver_fb'];
                 }
                 $sqlite->storeEntry('maintainer', $data);
 
@@ -180,11 +182,20 @@ class admin_plugin_approve extends DokuWiki_Admin_Plugin
         if ($auth->canDo('getUsers')) {
             echo '<select name="assignment[approver]">';
             echo '<option value="">---</option>';
+            if ($auth->canDo('getGroups')) {
+                foreach($auth->retrieveGroups() as $group) {
+                    echo '<option value="@' . hsc($group) . '">' . '@' . hsc($group) . '</option>';
+                }
+            }
             foreach($auth->retrieveUsers() as $login => $data) {
                 echo '<option value="' . hsc($login) . '">' . hsc($data['name']) . '</option>';
             }
             echo '</select>';
-
+            // in case your auth plugin can do groups, but not list them (like the default one),
+            // leave a text field as backup
+            if (!$auth->canDo('getGroups')) {
+                echo '<input name="assignment[approver_fb]" id="plugin__approve_group_input">';
+            }
         } else {
             echo '<input name="assignment[approver]">';
         }
