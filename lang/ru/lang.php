@@ -12,7 +12,7 @@ $lang['newest_draft'] = 'Последний черновик';
 $lang['newest_approved'] = 'Последняя утвержденная версия';
 
 $lang['hdr_page'] = 'Страница';
-$lang['hdr_state'] = 'State';
+$lang['hdr_state'] = 'Статус';
 $lang['hdr_updated'] = 'Обновлено';
 $lang['hdr_approver'] = $lang['approver'];
 
