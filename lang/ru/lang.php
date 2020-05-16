@@ -16,7 +16,7 @@ $lang['hdr_state'] = 'State';
 $lang['hdr_updated'] = 'Обновлено';
 $lang['hdr_approver'] = $lang['approver'];
 
-$lang['all_approved'] = 'Approved';
+$lang['all_approved'] = 'Утверждено';
 $lang['all_approved_ready'] = 'Готово к утверждению';
 
 $lang['by'] = 'пользователем';
