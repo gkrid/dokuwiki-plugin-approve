@@ -21,36 +21,12 @@ class admin_plugin_approve extends DokuWiki_Admin_Plugin
         return 1;
     }
 
-    protected function getPages() {
-        global $conf;
-        $datadir = $conf['datadir'];
-        if (substr($datadir, -1) != '/') {
-            $datadir .= '/';
-        }
-
-        $directory = new RecursiveDirectoryIterator($datadir, FilesystemIterator::SKIP_DOTS);
-        $iterator = new RecursiveIteratorIterator($directory);
-
-        $pages = [];
-        /** @var SplFileInfo $fileinfo */
-        foreach ($iterator as $fileinfo) {
-            if (!$fileinfo->isFile()) continue;
-
-            $path = $fileinfo->getPathname();
-            //remove .txt
-            $id = str_replace('/', ':', substr($path, strlen($datadir), -4));
-            $pages[] = $id;
-        }
-
-        return $pages;
-    }
-
     protected function updatePage(helper_plugin_sqlite $sqlite, helper_plugin_approve $helper)
     {
         //clean current settings
         $sqlite->query('DELETE FROM page');
 
-        $wikiPages = $this->getPages();
+        $wikiPages = $helper->getPages();
         $no_apr_namespace = $helper->no_apr_namespace($sqlite);
         $weighted_assignments = $helper->weighted_assignments($sqlite);
         foreach ($wikiPages as $id) {
