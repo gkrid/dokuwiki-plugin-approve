@@ -1,5 +1,4 @@
 <?php
-
 // must be run within Dokuwiki
 if (!defined('DOKU_INC')) die();
 class helper_plugin_approve extends DokuWiki_Plugin {
@@ -46,13 +45,16 @@ class helper_plugin_approve extends DokuWiki_Plugin {
         //check if we should update no_apr_namespace
         $this->no_apr_namespace($sqlite);
 
+        $approver = array();
         $res = $sqlite->query('SELECT page, approver FROM page WHERE page=? AND hidden=0', $id);
-        $row = $sqlite->res2row($res);
-        $approver = $row['approver'];
-        if ($row) {
-            return true;
+        while ($row = $sqlite->res2row($res)) {
+            $approver[] = $row['approver'];
         }
-        return false;
+        if (empty($approver)) {
+            $approver = null;
+            return false;
+        }
+        return true;
     }
 
     /**
@@ -137,10 +139,16 @@ class helper_plugin_approve extends DokuWiki_Plugin {
      * @return bool
      */
     public function isPageAssigned(helper_plugin_sqlite $sqlite, $id, &$pageApprover=null, $weighted_assignments=null) {
+
+        $pageApprover = [];
+        $currentWeight = -1;
+
         if (!$weighted_assignments) {
             $weighted_assignments = $this->weighted_assignments($sqlite);
         }
         foreach ($weighted_assignments as $assignment) {
+            $tmpApprover = null;
+            $tmpWeight = null;
             $ns = ltrim($assignment['namespace'], ':');
             $approver = $assignment['approver'];
             if (substr($ns, -2) == '**') {
@@ -148,7 +156,8 @@ class helper_plugin_approve extends DokuWiki_Plugin {
                 $ns = substr($ns, 0, -2);
                 if (substr($id, 0, strlen($ns)) == $ns) {
                     $newAssignment = true;
-                    $pageApprover = $approver;
+                    $tmpApprover = $approver;
+                    $tmpWeight = $assignment['weight'];
                 }
             } elseif (substr($ns, -1) == '*') {
                 //remove '*'
@@ -157,11 +166,20 @@ class helper_plugin_approve extends DokuWiki_Plugin {
                 if (strpos($noNS, ':') === FALSE &&
                     substr($id, 0, strlen($ns)) == $ns) {
                     $newAssignment = true;
-                    $pageApprover = $approver;
+                    $tmpApprover = $approver;
+                    $tmpWeight = $assignment['weight'];
                 }
             } elseif($id == $ns) {
                 $newAssignment = true;
-                $pageApprover = $approver;
+                $tmpApprover = $approver;
+                $tmpWeight = $assignment['weight'];
+            }
+
+            if ($tmpApprover && $tmpWeight > $currentWeight) {
+                $pageApprover = [ $tmpApprover ];
+                $currentWeight = $tmpWeight;
+            } elseif ($tmpApprover && $tmpWeight == $currentWeight) {
+                $pageApprover[] = $tmpApprover;
             }
         }
         return $newAssignment;
@@ -198,14 +216,19 @@ class helper_plugin_approve extends DokuWiki_Plugin {
         //user not log in
         if (!isset($INFO['userinfo'])) return false;
 
-        if ($pageApprover == $INFO['client']) {
-            return true;
-        } elseif ($this->isGroup($pageApprover) && $this->isInGroup($INFO['userinfo'], $pageApprover)) {
-            return true;
+        if (empty($pageApprover)) return true;
+
         //no approver provided, check if approve plugin apply here
-        } elseif (auth_quickaclcheck($id) >= AUTH_DELETE &&
-            (!$pageApprover || !$this->getConf('strict_approver'))) {
-            return true;
+        foreach ($pageApprover as $approver) {
+            if ($approver == $INFO['client']) {
+                return true;
+            } elseif ($this->isGroup($approver) && $this->isInGroup($INFO['userinfo'], $approver)) {
+                return true;
+            //no approver provided, check if approve plugin apply here
+            } elseif (auth_quickaclcheck($id) >= AUTH_DELETE &&
+                (!$approver || !$this->getConf('strict_approver'))) {
+                return true;
+            }
         }
 
         return false;

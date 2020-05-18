@@ -328,7 +328,8 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
 		}
 
 		if ($approver) {
-            ptln(' | ' . $this->getLang('approver') . ': ' . userlink($approver, true));
+                    ptln(' | ' . $this->getLang('approver') . ': ' . join(", ", $approver));
+
         }
 
 		ptln('</div>');
