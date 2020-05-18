@@ -174,6 +174,7 @@ class syntax_plugin_approve_table extends DokuWiki_Syntax_Plugin {
                     FROM page INNER JOIN revision ON page.page = revision.page
                     WHERE page.hidden = 0 AND revision.current=1 AND page.page LIKE ? ESCAPE '_'
                             $approver_query
+                    GROUP BY page.page
                     ORDER BY colons, page.page";
 
         $res = $sqlite->query($q, $query_args);
