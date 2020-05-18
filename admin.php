@@ -21,36 +21,12 @@ class admin_plugin_approve extends DokuWiki_Admin_Plugin
         return 1;
     }
 
-    protected function getPages() {
-        global $conf;
-        $datadir = $conf['datadir'];
-        if (substr($datadir, -1) != '/') {
-            $datadir .= '/';
-        }
-
-        $directory = new RecursiveDirectoryIterator($datadir, FilesystemIterator::SKIP_DOTS);
-        $iterator = new RecursiveIteratorIterator($directory);
-
-        $pages = [];
-        /** @var SplFileInfo $fileinfo */
-        foreach ($iterator as $fileinfo) {
-            if (!$fileinfo->isFile()) continue;
-
-            $path = $fileinfo->getPathname();
-            //remove .txt
-            $id = str_replace('/', ':', substr($path, strlen($datadir), -4));
-            $pages[] = $id;
-        }
-
-        return $pages;
-    }
-
     protected function updatePage(helper_plugin_sqlite $sqlite, helper_plugin_approve $helper)
     {
         //clean current settings
         $sqlite->query('DELETE FROM page');
 
-        $wikiPages = $this->getPages();
+        $wikiPages = $helper->getPages();
         $no_apr_namespace = $helper->no_apr_namespace($sqlite);
         $weighted_assignments = $helper->weighted_assignments($sqlite);
         foreach ($wikiPages as $id) {
@@ -101,6 +77,8 @@ class admin_plugin_approve extends DokuWiki_Admin_Plugin
                 ];
                 if (!blank($assignment['approver'])) {
                     $data['approver'] = $assignment['approver'];
+                } else if (!blank($assignment['approver_fb'])) {
+                    $data['approver'] = $assignment['approver_fb'];
                 }
                 $sqlite->storeEntry('maintainer', $data);
 
@@ -182,11 +160,20 @@ class admin_plugin_approve extends DokuWiki_Admin_Plugin
         if ($auth->canDo('getUsers')) {
             echo '<select name="assignment[approver]">';
             echo '<option value="">---</option>';
+            if ($auth->canDo('getGroups')) {
+                foreach($auth->retrieveGroups() as $group) {
+                    echo '<option value="@' . hsc($group) . '">' . '@' . hsc($group) . '</option>';
+                }
+            }
             foreach($auth->retrieveUsers() as $login => $data) {
                 echo '<option value="' . hsc($login) . '">' . hsc($data['name']) . '</option>';
             }
             echo '</select>';
-
+            // in case your auth plugin can do groups, but not list them (like the default one),
+            // leave a text field as backup
+            if (!$auth->canDo('getGroups')) {
+                echo '<input name="assignment[approver_fb]" id="plugin__approve_group_input">';
+            }
         } else {
             echo '<input name="assignment[approver]">';
         }

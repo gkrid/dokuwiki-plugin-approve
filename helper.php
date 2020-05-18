@@ -186,6 +186,27 @@ class helper_plugin_approve extends DokuWiki_Plugin {
     }
 
     /**
+     * @param string $approver
+     * @return bool
+     */
+    public function isGroup($approver) {
+	if (!$approver) return false;
+        if (strncmp($approver, "@", 1) === 0) return true;
+        return false;
+    }
+
+    /**
+     * @param $userinfo
+     * @param string $group
+     * @return bool
+     */
+    public function isInGroup($userinfo, $group) {
+        $groupname = substr($group, 1);
+        if (in_array($groupname, $userinfo['grps'])) return true;
+        return false;
+    }
+
+    /**
      * @param $id
      * @param string $pageApprover
      * @return bool
@@ -201,6 +222,9 @@ class helper_plugin_approve extends DokuWiki_Plugin {
         foreach ($pageApprover as $approver) {
             if ($approver == $INFO['client']) {
                 return true;
+            } elseif ($this->isGroup($approver) && $this->isInGroup($INFO['userinfo'], $approver)) {
+                return true;
+            //no approver provided, check if approve plugin apply here
             } elseif (auth_quickaclcheck($id) >= AUTH_DELETE &&
                 (!$approver || !$this->getConf('strict_approver'))) {
                 return true;
@@ -229,5 +253,51 @@ class helper_plugin_approve extends DokuWiki_Plugin {
         if ($this->client_can_approve($id, $pageApprover)) return true;
 
         return false;
+    }
+
+    /**
+     * Get the array of all pages ids in wiki
+     *
+     * @return array
+     */
+    public function getPages() {
+        global $conf;
+
+        $datadir = realpath($conf['datadir']);  // path without ending "/"
+        $directory = new RecursiveDirectoryIterator($datadir, FilesystemIterator::SKIP_DOTS);
+        $iterator = new RecursiveIteratorIterator($directory);
+
+        $pages = [];
+        /** @var SplFileInfo $fileinfo */
+        foreach ($iterator as $fileinfo) {
+            if (!$fileinfo->isFile()) continue;
+
+            $path = $fileinfo->getRealPath(); // it should return "/" both on windows and linux
+            //remove dir part
+            $path = substr($path, strlen($datadir));
+            //make file a dokuwiki path
+            $id = $this->pathID($path);
+            $pages[] = $id;
+        }
+
+        return $pages;
+    }
+
+    /**
+     * translates a document path to an ID
+     *
+     * fixes dokuwiki pathID - support for Windows enviroment
+     *
+     * @param string $path
+     * @param bool $keeptxt
+     *
+     * @return mixed|string
+     */
+    public function pathID($path,$keeptxt=false){
+        $id = utf8_decodeFN($path);
+        $id = str_replace(DIRECTORY_SEPARATOR,':',$id);
+        if(!$keeptxt) $id = preg_replace('#\.txt$#','',$id);
+        $id = trim($id, ':');
+        return $id;
     }
 }

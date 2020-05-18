@@ -32,3 +32,5 @@ $lang['admin h_assignment_namespace'] = 'Page/Namespace';
 $lang['admin h_assignment_approver'] = $lang['approver'];
 
 $lang['notification full'] = 'You have a page to approve: %s';
+
+$lang['js']['group_option_label'] = 'Group:';
