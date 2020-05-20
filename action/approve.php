@@ -179,6 +179,13 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
     public function handle_display_banner(Doku_Event $event) {
 		global $INFO;
 
+		/* Return true if banner should not be displayed for users with or below read only permission. */
+		if($this->getConf('hide_banner_for_readonly') && auth_quickaclcheck($ID) <= AUTH_READ) {
+			return true;
+		};
+		
+
+		/* Not returned - rendering the banner */
         try {
             /** @var \helper_plugin_approve_db $db_helper */
             $db_helper = plugin_load('helper', 'approve_db');
@@ -227,8 +234,11 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
 		if ($approve['approved']) {
 			ptln('<strong>'.$this->getLang('approved').'</strong>');
             ptln(' ' . dformat(strtotime($approve['approved'])));
-            ptln(' ' . $this->getLang('by') . ' ' . userlink($approve['approved_by'], true));
-            ptln(' (' . $this->getLang('version') .  ': ' . $approve['version'] . ')');
+			
+			if($this->getConf('banner_long')) {
+				ptln(' ' . $this->getLang('by') . ' ' . userlink($approve['approved_by'], true));
+				ptln(' (' . $this->getLang('version') .  ': ' . $approve['version'] . ')');
+			}
 
 			//not the newest page
 			if ($rev != $last_change_date) {
@@ -327,7 +337,7 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
             }
 		}
 
-		if ($approver) {
+		if ($approver && $this->getConf('banner_long')) {
             ptln(' | ' . $this->getLang('approver') . ': ' . userlink($approver, true));
         }
 
