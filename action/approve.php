@@ -180,7 +180,7 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
 		global $INFO;
 
 		/* Return true if banner should not be displayed for users with or below read only permission. */
-		if($this->getConf('hide_banner_for_readonly') && auth_quickaclcheck($ID) <= AUTH_READ) {
+		if(auth_quickaclcheck($ID) <= AUTH_READ && !$this->getConf('display_banner_for_readonly')) {
 			return true;
 		};
 		
