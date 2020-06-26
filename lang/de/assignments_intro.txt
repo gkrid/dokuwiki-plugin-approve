@@ -1,0 +1,8 @@
+========= Genehmigungen zuordnen ========
+
+Hier können Sie Seiten/Namensräume definieren, auf denen das Approve-Plugin verwendet wird, und deren Genehmigende angeben.
+Eine präzisere Regel überlagert die allgemeinere.
+
+  * Namensräume ohne Unter-Namensräume werden als ''<nowiki>namespace:*</nowiki>'' zugewiesen.
+  * Namensräume, die Unter-Namensräume einschließen, werden als ''<nowiki>namespace:**</nowiki>'' zugewiesen.
+  * Seiten werden wie üblich mit ihrer vollständigen Seiten-ID angegeben.
