@@ -172,7 +172,7 @@ class syntax_plugin_approve_table extends DokuWiki_Syntax_Plugin {
                     revision.ready_for_approval, revision.ready_for_approval_by,
                     LENGTH(page.page) - LENGTH(REPLACE(page.page, ':', '')) AS colons
                     FROM page INNER JOIN revision ON page.page = revision.page
-                    WHERE page.hidden = 0 AND revision.current=1 AND page.page LIKE ? ESCAPE '_'
+                    WHERE page.hidden = 0 AND revision.current=1 AND page.page LIKE ?
                             $approver_query
                     ORDER BY colons, page.page";
 
