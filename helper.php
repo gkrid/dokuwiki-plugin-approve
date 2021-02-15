@@ -66,6 +66,20 @@ class helper_plugin_approve extends DokuWiki_Plugin {
                                 ORDER BY rev DESC LIMIT 1', $id);
         return $sqlite->res2single($res);
     }
+	
+    public function find_last_approved_ver(helper_plugin_sqlite $sqlite, $id) {
+        $res = $sqlite->query('SELECT version FROM revision
+                                WHERE page=? AND approved IS NOT NULL
+                                ORDER BY rev DESC LIMIT 1', $id);
+        return $sqlite->res2single($res);
+    }
+	
+	public function find_last_approved_app(helper_plugin_sqlite $sqlite, $id) {
+        $res = $sqlite->query('SELECT approved FROM revision
+                                WHERE page=? AND approved IS NOT NULL
+                                ORDER BY rev DESC LIMIT 1', $id);
+        return $sqlite->res2single($res);
+    }
 
     /**
      * @param helper_plugin_sqlite $sqlite
