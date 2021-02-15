@@ -177,7 +177,7 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
      * @param Doku_Event $event
      */
     public function handle_display_banner(Doku_Event $event) {
-		global $INFO;
+		global $INFO, $ID;
 
 		/* Return true if banner should not be displayed for users with or below read only permission. */
 		if(auth_quickaclcheck($ID) <= AUTH_READ && !$this->getConf('display_banner_for_readonly')) {

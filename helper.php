@@ -153,7 +153,7 @@ class helper_plugin_approve extends DokuWiki_Plugin {
             } elseif (substr($ns, -1) == '*') {
                 //remove '*'
                 $ns = substr($ns, 0, -1);
-                $noNS = substr($id, strlen($id));
+                $noNS = substr($id, strlen($ns));
                 if (strpos($noNS, ':') === FALSE &&
                     substr($id, 0, strlen($ns)) == $ns) {
                     $newAssignment = true;
@@ -165,6 +165,31 @@ class helper_plugin_approve extends DokuWiki_Plugin {
             }
         }
         return $newAssignment;
+    }
+
+    /**
+     * @param helper_plugin_sqlite $sqlite
+     */
+    public function updatePagesAssignments(helper_plugin_sqlite $sqlite)
+    {
+        //clean current settings
+        $sqlite->query('DELETE FROM page');
+
+        $wikiPages = $this->getPages();
+        $no_apr_namespace = $this->no_apr_namespace($sqlite);
+        $weighted_assignments = $this->weighted_assignments($sqlite);
+        foreach ($wikiPages as $id) {
+            if ($this->isPageAssigned($sqlite, $id, $approver, $weighted_assignments)) {
+                $data = [
+                    'page' => $id,
+                    'hidden' => $this->in_hidden_namespace($sqlite, $id, $no_apr_namespace) ? '1' : '0'
+                ];
+                if (!blank($approver)) {
+                    $data['approver'] = $approver;
+                }
+                $sqlite->storeEntry('page', $data);
+            }
+        }
     }
 
     /**

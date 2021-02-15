@@ -266,4 +266,15 @@ class action_plugin_approve_migration extends DokuWiki_Action_Plugin
 
         return $revision_editors;
     }
+
+    protected function migration3($data)
+    {
+        /** @var helper_plugin_sqlite $sqlite */
+        $sqlite = $data['sqlite'];
+
+        /** @var helper_plugin_approve $helper */
+        $helper = plugin_load('helper', 'approve');
+
+        $helper->updatePagesAssignments($sqlite);
+    }
 }

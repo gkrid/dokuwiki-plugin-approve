@@ -21,28 +21,6 @@ class admin_plugin_approve extends DokuWiki_Admin_Plugin
         return 1;
     }
 
-    protected function updatePage(helper_plugin_sqlite $sqlite, helper_plugin_approve $helper)
-    {
-        //clean current settings
-        $sqlite->query('DELETE FROM page');
-
-        $wikiPages = $helper->getPages();
-        $no_apr_namespace = $helper->no_apr_namespace($sqlite);
-        $weighted_assignments = $helper->weighted_assignments($sqlite);
-        foreach ($wikiPages as $id) {
-            if ($helper->isPageAssigned($sqlite, $id, $approver, $weighted_assignments)) {
-                $data = [
-                    'page' => $id,
-                    'hidden' => $helper->in_hidden_namespace($sqlite, $id, $no_apr_namespace) ? '1' : '0'
-                ];
-                if (!blank($approver)) {
-                    $data['approver'] = $approver;
-                }
-                $sqlite->storeEntry('page', $data);
-            }
-        }
-    }
-
     /**
      * Should carry out any processing required by the plugin.
      */
@@ -68,7 +46,7 @@ class admin_plugin_approve extends DokuWiki_Admin_Plugin
             //insert empty string as NULL
             if ($INPUT->str('action') === 'delete') {
                 $sqlite->query('DELETE FROM maintainer WHERE id=?', $assignment['id']);
-                $this->updatePage($sqlite, $helper);
+                $helper->updatePagesAssignments($sqlite);
             } else if ($INPUT->str('action') === 'add' && !blank($assignment['assign'])) {
                 $data = [
                     'namespace' => $assignment['assign']
@@ -80,7 +58,7 @@ class admin_plugin_approve extends DokuWiki_Admin_Plugin
                 }
                 $sqlite->storeEntry('maintainer', $data);
 
-                $this->updatePage($sqlite, $helper);
+                $helper->updatePagesAssignments($sqlite);
             }
 
             send_redirect(wl($ID, array('do' => 'admin', 'page' => 'approve'), true, '&'));
