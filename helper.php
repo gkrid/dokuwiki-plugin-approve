@@ -241,7 +241,14 @@ class helper_plugin_approve extends DokuWiki_Plugin {
      * @return bool
      */
     public function client_can_mark_ready_for_approval($id) {
-        return auth_quickaclcheck($id) >= AUTH_EDIT;
+        global $INFO;
+        // MTK 2021-10-22 only QMB can mark ready for approval
+        //   return auth_quickaclcheck($id) >= AUTH_EDIT;
+        if ($this->isInGroup($INFO['userinfo'], '@qmb')) {
+            return true;
+        } else {
+            return false;
+        }
     }
 
     /**
@@ -249,13 +256,36 @@ class helper_plugin_approve extends DokuWiki_Plugin {
      * @return bool
      */
     public function client_can_see_drafts($id, $pageApprover) {
+        global $INFO;
         if (!$this->getConf('hide_drafts_for_viewers')) return true;
+        
+
+/* Added 2022-08-08: QMB können immer Entwürfe sehen
+ * */
+        if ($this->isInGroup($INFO['userinfo'], '@qmb')) {
+            return true;
+        }
+
+
+/* Added 2021-10-18: Nur mit gesetztem Edit-Mode darf man den Draft sehen
+ * */
+
+        
+
+	if ($_SESSION["approve_mode"] != 'edit') { 
+	    return false;
+	}
 
         if (auth_quickaclcheck($id) >= AUTH_EDIT) return true;
         if ($this->client_can_approve($id, $pageApprover)) return true;
 
         return false;
     }
+
+
+
+
+
 
     /**
      * Get the array of all pages ids in wiki

@@ -23,6 +23,8 @@ class action_plugin_approve_revisions extends DokuWiki_Action_Plugin {
         $helper = plugin_load('helper', 'approve');
 
         if (!$helper->use_approve_here($sqlite, $INFO['id'])) return;
+		    // MTK 2021-10-13  hinzu
+        $last_approved_rev = $helper->find_last_approved($sqlite, $INFO['id']);
 
         $res = $sqlite->query('SELECT rev, approved, ready_for_approval
                                 FROM revision
@@ -44,8 +46,11 @@ class action_plugin_approve_revisions extends DokuWiki_Action_Plugin {
                 }
                 if (!isset($approveRevisions[$revision])) {
                     $class =  'plugin__approve_red';
-                } elseif ($approveRevisions[$revision]['approved']) {
+		    // MTK 2021-10-13 && Konstrukt hinz
+                } elseif (($approveRevisions[$revision]['approved']) && ($last_approved_rev == $revision)) {
                     $class =  'plugin__approve_green';
+                } elseif ($approveRevisions[$revision]['approved']) {
+                    $class =  'plugin__approve_old';
                 } elseif ($this->getConf('ready_for_approval') && $approveRevisions[$revision]['ready_for_approval']) {
                     $class =  'plugin__approve_ready';
                 } else {

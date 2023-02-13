@@ -213,12 +213,19 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
 
         $approve = $sqlite->res_fetch_assoc($res);
 
-		$classes = [];
-		if ($this->getConf('prettyprint')) {
+	$classes = [];
+	if ($this->getConf('prettyprint')) {
 		    $classes[] = 'plugin__approve_noprint';
         }
 
-        if ($approve['approved']) {
+
+	// MTK 2021-10-13 Hinzufügen 
+	// um aktuelle freigegebene Version zu prüfen.
+        $last_approved_rev = $helper->find_last_approved($sqlite, $INFO['id']);
+	
+	// MTK 2021-10-13 &&-Construkt hinzu um die Farbe rot zu lassen, wenn nicht aktuell	
+	//
+        if (($approve['approved']) && ($last_approved_rev == $rev)) {
 		    $classes[] = 'plugin__approve_green';
 		} elseif ($this->getConf('ready_for_approval') && $approve['ready_for_approval']) {
 		    $classes[] = 'plugin__approve_ready';
@@ -231,77 +238,74 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
 //		tpl_pageinfo();
 //		ptln(' | ');
 
-		if ($approve['approved']) {
-			ptln('<strong>'.$this->getLang('approved').'</strong>');
-            ptln(' ' . dformat(strtotime($approve['approved'])));
-			
-			if($this->getConf('banner_long')) {
-				ptln(' ' . $this->getLang('by') . ' ' . userlink($approve['approved_by'], true));
-				ptln(' (' . $this->getLang('version') .  ': ' . $approve['version'] . ')');
-			}
 
-			//not the newest page
-			if ($rev != $last_change_date) {
-                $res = $sqlite->query('SELECT rev, current FROM revision
+		if ($approve['approved']) {
+		    ptln('<strong>'.$this->getLang('approved').'</strong>');
+           	    ptln(' ' . dformat(strtotime($approve['approved'])));
+			
+		    if($this->getConf('banner_long')) {
+		        ptln(' ' . $this->getLang('by') . ' ' . userlink($approve['approved_by'], true));
+		        ptln(' (' . $this->getLang('version') .  ': ' . $approve['version'] . ')');
+		    }
+
+		    //not the newest page
+		    if ($rev != $last_change_date) {
+                        $res = $sqlite->query('SELECT rev, current FROM revision
                                 WHERE page=? AND approved IS NOT NULL
                                 ORDER BY rev DESC LIMIT 1', $INFO['id']);
+                        $last_approve = $sqlite->res_fetch_assoc($res);
 
-                $last_approve = $sqlite->res_fetch_assoc($res);
-
-			    //we can see drafts
-                if ($helper->client_can_see_drafts($INFO['id'], $approver)) {
-                    ptln('<a href="' . wl($INFO['id']) . '">');
-                    ptln($this->getLang($last_approve['current'] ? 'newest_approved' : 'newest_draft'));
-                    ptln('</a>');
-                //we cannot see link to draft but there is some newer approved version
-                } elseif ($last_approve['rev'] != $rev) {
-                    $urlParameters = [];
-                    if (!$last_approve['current']) {
-                        $urlParameters['rev'] = $last_approve['rev'];
-                    }
-                    ptln('<a href="' . wl($INFO['id'], $urlParameters) . '">');
-                    ptln($this->getLang('newest_approved'));
-                    ptln('</a>');
-                }
-            }
-
-		} else {
+			//we can see drafts
+               		if ($helper->client_can_see_drafts($INFO['id'], $approver)) {
+                    	    ptln('<a href="' . wl($INFO['id']) . '">');
+                    	    ptln($this->getLang($last_approve['current'] ? 'newest_approved' : 'newest_draft'));
+                    	    ptln('</a>');
+                	//we cannot see link to draft but there is some newer approved version
+                	} elseif ($last_approve['rev'] != $rev) {
+                	    $urlParameters = [];
+                	    if (!$last_approve['current']) {
+               	 	        $urlParameters['rev'] = $last_approve['rev'];
+                            }
+                    	    ptln('<a href="' . wl($INFO['id'], $urlParameters) . '">');
+                    	    ptln($this->getLang('newest_approved'));
+                    	    ptln('</a>');
+                	}
+            	    }
+		} else {  // not approved
 		    if ($this->getConf('ready_for_approval') && $approve['ready_for_approval']) {
-				ptln('<strong>'.$this->getLang('marked_approve_ready').'</strong>');
-                ptln(' ' . dformat(strtotime($approve['ready_for_approval'])));
-                ptln(' ' . $this->getLang('by') . ' ' . userlink($approve['ready_for_approval_by'], true));
-			} else {
-                ptln('<strong>'.$this->getLang('draft').'</strong>');
-            }
+		        ptln('<strong>'.$this->getLang('marked_approve_ready').'</strong>');
+                	ptln(' ' . dformat(strtotime($approve['ready_for_approval'])));
+                	ptln(' ' . $this->getLang('by') . ' ' . userlink($approve['ready_for_approval_by'], true));
+		    } else { // not approved and not ready for approval
+                	ptln('<strong>'.$this->getLang('draft').'</strong>');
+            	    }
 
-
-            $res = $sqlite->query('SELECT rev, current FROM revision
+            	    $res = $sqlite->query('SELECT rev, current FROM revision
                             WHERE page=? AND approved IS NOT NULL
                             ORDER BY rev DESC LIMIT 1', $INFO['id']);
+            	    $last_approve = $sqlite->res_fetch_assoc($res);
 
-            $last_approve = $sqlite->res_fetch_assoc($res);
 
-
-            //not exists approve for current page
-			if (!$last_approve) {
-                //not the newest page
-                if ($rev != $last_change_date) {
-				    ptln('<a href="'.wl($INFO['id']).'">');
-                    ptln($this->getLang('newest_draft'));
-				    ptln('</a>');
-				}
-			} else {
-                $urlParameters = [];
-                if (!$last_approve['current']) {
-                    $urlParameters['rev'] = $last_approve['rev'];
-                }
-                ptln('<a href="' . wl($INFO['id'], $urlParameters) . '">');
-                ptln($this->getLang('newest_approved'));
-				ptln('</a>');
+            	    //not exists approve for current page
+		    if (!$last_approve) {
+                        //not the newest page
+                	if ($rev != $last_change_date) {
+			    ptln('<a href="'.wl($INFO['id']).'">');
+                            ptln($this->getLang('newest_draft'));
+		            ptln('</a>');
 			}
+		    } else {  // a last approved exists
+                	$urlParameters = [];
+                	if (!$last_approve['current']) {
+                    	    $urlParameters['rev'] = $last_approve['rev'];
+                        }
+                        ptln('<a href="' . wl($INFO['id'], $urlParameters) . '">');
+                        ptln($this->getLang('newest_approved'));
+			ptln('</a>');
+	            }
 
-			//we are in current page
-			if ($rev == $last_change_date) {
+		    //we are in current page
+		    if ($rev == $last_change_date) {
 
 			    //compare with the last approved page or 0 if there is no approved versions
                 $last_approved_rev = 0;

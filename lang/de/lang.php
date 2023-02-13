@@ -1,15 +1,15 @@
 <?php
 
 $lang['approve'] = 'freigeben';
-$lang['approved'] = 'Geprüft';
+$lang['approved'] = 'Freigegeben';
 $lang['version'] = 'Version';
-$lang['approver'] = 'Genehmiger';
+$lang['approver'] = 'Freigebender';
 
 $lang['draft'] = 'Entwurf';
-$lang['approve_ready'] = 'Als freizugeben markieren';
-$lang['marked_approve_ready'] = 'Fertig zur Freigabe';
+$lang['approve_ready'] = 'Als vom QMB geprüft markieren';
+$lang['marked_approve_ready'] = 'Geprüft, Fertig zur Freigabe';
 
-$lang['last_approved'] = 'zuletzt geprüft';
+$lang['last_approved'] = 'zuletzt freigegeben';
 $lang['newest_draft'] = ' -> Neuester Entwurf';
 $lang['newest_approved'] = ' -> Aktuelle Freigabe';
 
