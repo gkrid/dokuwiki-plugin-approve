@@ -20,7 +20,7 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
      * @param Doku_Event $event
      */
     public function handle_diff_accept(Doku_Event $event) {
-		global $INFO;
+        global $INFO;
 
         try {
             /** @var \helper_plugin_approve_db $db_helper */
@@ -33,18 +33,18 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
         /** @var helper_plugin_approve $helper */
         $helper = plugin_load('helper', 'approve');
 
-		if (!$helper->use_approve_here($sqlite, $INFO['id'])) return;
+        if (!$helper->use_approve_here($sqlite, $INFO['id'])) return;
 
-		if ($event->data == 'diff' && isset($_GET['approve'])) {
-		    $href = wl($INFO['id'], ['approve' => 'approve']);
-			ptln('<a href="' . $href . '">'.$this->getLang('approve').'</a>');
-		}
+        if ($event->data == 'diff' && isset($_GET['approve'])) {
+            $href = wl($INFO['id'], ['approve' => 'approve']);
+            ptln('<a href="' . $href . '">'.$this->getLang('approve').'</a>');
+        }
 
         if ($this->getConf('ready_for_approval') && $event->data == 'diff' && isset($_GET['ready_for_approval'])) {
             $href = wl($INFO['id'], ['ready_for_approval' => 'ready_for_approval']);
             ptln('<a href="' . $href . '">'.$this->getLang('approve_ready').'</a>');
-		}
-	}
+        }
+    }
 
     /**
      * @param Doku_Event $event
@@ -66,16 +66,16 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
         if (!$helper->use_approve_here($sqlite, $INFO['id'])) return;
 
         $last_approved_rev = $helper->find_last_approved($sqlite, $INFO['id']);
-		if ($last_approved_rev == $INFO['rev']) {
+        if ($last_approved_rev == $INFO['rev']) {
             $event->preventDefault();
         }
-	}
+    }
 
-	/**
+    /**
      * @param Doku_Event $event
      */
     public function handle_approve(Doku_Event $event) {
-		global $INFO;
+        global $INFO;
 
         try {
             /** @var \helper_plugin_approve_db $db_helper */
@@ -106,7 +106,7 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
                         date('c'), $INFO['client'], $next_version, $INFO['id']);
 
         header('Location: ' . wl($INFO['id']));
-	}
+    }
 
     /**
      * @param Doku_Event $event
@@ -170,22 +170,21 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
         //current page is approved
         if ($last_approved_rev == $last_change_date) return;
 
-	    header("Location: " . wl($INFO['id'], ['rev' => $last_approved_rev], false, '&'));
-	}
+        header("Location: " . wl($INFO['id'], ['rev' => $last_approved_rev], false, '&'));
+    }
 
     /**
      * @param Doku_Event $event
      */
     public function handle_display_banner(Doku_Event $event) {
-		global $INFO, $ID;
+        global $INFO, $ID;
 
-		/* Return true if banner should not be displayed for users with or below read only permission. */
-		if(auth_quickaclcheck($ID) <= AUTH_READ && !$this->getConf('display_banner_for_readonly')) {
-			return true;
-		};
-		
+        /* Return true if banner should not be displayed for users with or below read only permission. */
+        if (auth_quickaclcheck($ID) <= AUTH_READ && !$this->getConf('display_banner_for_readonly')) {
+            return true;
+        }
 
-		/* Not returned - rendering the banner */
+        /* Not returned - rendering the banner */
         try {
             /** @var \helper_plugin_approve_db $db_helper */
             $db_helper = plugin_load('helper', 'approve_db');
@@ -213,42 +212,42 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
 
         $approve = $sqlite->res_fetch_assoc($res);
 
-		$classes = [];
-		if ($this->getConf('prettyprint')) {
-		    $classes[] = 'plugin__approve_noprint';
+        $classes = [];
+        if ($this->getConf('prettyprint')) {
+            $classes[] = 'plugin__approve_noprint';
         }
 
         if ($approve['approved']) {
-		    $classes[] = 'plugin__approve_green';
-		} elseif ($this->getConf('ready_for_approval') && $approve['ready_for_approval']) {
-		    $classes[] = 'plugin__approve_ready';
+            $classes[] = 'plugin__approve_green';
+        } elseif ($this->getConf('ready_for_approval') && $approve['ready_for_approval']) {
+            $classes[] = 'plugin__approve_ready';
         } else {
             $classes[] = 'plugin__approve_red';
         }
 
-		ptln('<div id="plugin__approve" class="' . implode(' ', $classes) . '">');
+        ptln('<div id="plugin__approve" class="' . implode(' ', $classes) . '">');
 
 //		tpl_pageinfo();
 //		ptln(' | ');
 
-		if ($approve['approved']) {
-			ptln('<strong>'.$this->getLang('approved').'</strong>');
+        if ($approve['approved']) {
+            ptln('<strong>'.$this->getLang('approved').'</strong>');
             ptln(' ' . dformat(strtotime($approve['approved'])));
-			
-			if($this->getConf('banner_long')) {
-				ptln(' ' . $this->getLang('by') . ' ' . userlink($approve['approved_by'], true));
-				ptln(' (' . $this->getLang('version') .  ': ' . $approve['version'] . ')');
-			}
 
-			//not the newest page
-			if ($rev != $last_change_date) {
+            if($this->getConf('banner_long')) {
+                ptln(' ' . $this->getLang('by') . ' ' . userlink($approve['approved_by'], true));
+                ptln(' (' . $this->getLang('version') .  ': ' . $approve['version'] . ')');
+            }
+
+            //not the newest page
+            if ($rev != $last_change_date) {
                 $res = $sqlite->query('SELECT rev, current FROM revision
                                 WHERE page=? AND approved IS NOT NULL
                                 ORDER BY rev DESC LIMIT 1', $INFO['id']);
 
                 $last_approve = $sqlite->res_fetch_assoc($res);
 
-			    //we can see drafts
+                //we can see drafts
                 if ($helper->client_can_see_drafts($INFO['id'], $approver)) {
                     ptln('<a href="' . wl($INFO['id']) . '">');
                     ptln($this->getLang($last_approve['current'] ? 'newest_approved' : 'newest_draft'));
@@ -265,12 +264,12 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
                 }
             }
 
-		} else {
-		    if ($this->getConf('ready_for_approval') && $approve['ready_for_approval']) {
-				ptln('<strong>'.$this->getLang('marked_approve_ready').'</strong>');
+        } else {
+            if ($this->getConf('ready_for_approval') && $approve['ready_for_approval']) {
+                ptln('<strong>'.$this->getLang('marked_approve_ready').'</strong>');
                 ptln(' ' . dformat(strtotime($approve['ready_for_approval'])));
                 ptln(' ' . $this->getLang('by') . ' ' . userlink($approve['ready_for_approval_by'], true));
-			} else {
+            } else {
                 ptln('<strong>'.$this->getLang('draft').'</strong>');
             }
 
@@ -283,27 +282,27 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
 
 
             //not exists approve for current page
-			if (!$last_approve) {
+            if (!$last_approve) {
                 //not the newest page
                 if ($rev != $last_change_date) {
-				    ptln('<a href="'.wl($INFO['id']).'">');
+                    ptln('<a href="'.wl($INFO['id']).'">');
                     ptln($this->getLang('newest_draft'));
-				    ptln('</a>');
-				}
-			} else {
+                    ptln('</a>');
+                }
+            } else {
                 $urlParameters = [];
                 if (!$last_approve['current']) {
                     $urlParameters['rev'] = $last_approve['rev'];
                 }
                 ptln('<a href="' . wl($INFO['id'], $urlParameters) . '">');
                 ptln($this->getLang('newest_approved'));
-				ptln('</a>');
-			}
+                ptln('</a>');
+            }
 
-			//we are in current page
-			if ($rev == $last_change_date) {
+            //we are in current page
+            if ($rev == $last_change_date) {
 
-			    //compare with the last approved page or 0 if there is no approved versions
+                //compare with the last approved page or 0 if there is no approved versions
                 $last_approved_rev = 0;
                 if (isset($last_approve['rev'])) {
                     $last_approved_rev = $last_approve['rev'];
@@ -335,14 +334,14 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
                     ptln('</a>');
                 }
             }
-		}
+        }
 
-		if ($approver && $this->getConf('banner_long')) {
+        if ($approver && $this->getConf('banner_long')) {
             ptln(' | ' . $this->getLang('approver') . ': ' . userlink($approver, true));
         }
 
-		ptln('</div>');
-	}
+        ptln('</div>');
+    }
 
     /**
      * @return bool|string|void

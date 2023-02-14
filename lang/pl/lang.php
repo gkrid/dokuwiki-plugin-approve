@@ -35,3 +35,6 @@ $lang['admin h_assignment_approver'] = $lang['approver'];
 $lang['notification full'] = 'Masz stronę do zatwierdzenia: %s';
 
 $lang['js']['group_option_label'] = 'Grupa:';
+
+$lang['btn_view_mode'] = 'Tryb przeglądania';
+$lang['btn_edit_mode'] = 'Tryb edycji';

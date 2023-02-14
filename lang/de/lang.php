@@ -31,3 +31,6 @@ $lang['admin h_assignment_namespace'] = 'Seite/Namensraum';
 $lang['admin h_assignment_approver'] = $lang['approver'];
 
 $lang['notification full'] = 'Sie können folgende Seite freigeben: %s';
+
+$lang['btn_view_mode'] = 'Zum Viewmode';
+$lang['btn_edit_mode'] = 'Zum Editmode';

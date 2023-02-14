@@ -34,3 +34,6 @@ $lang['admin h_assignment_approver'] = $lang['approver'];
 $lang['notification full'] = 'You have a page to approve: %s';
 
 $lang['js']['group_option_label'] = 'Group:';
+
+$lang['btn_view_mode'] = 'View mode';
+$lang['btn_edit_mode'] = 'Edit mode';
