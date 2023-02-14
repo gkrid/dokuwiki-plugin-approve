@@ -249,6 +249,9 @@ class helper_plugin_approve extends DokuWiki_Plugin {
      * @return bool
      */
     public function client_can_see_drafts($id, $pageApprover) {
+        // in view mode no one can see drafts
+        if ($this->getConf('viewmode') && get_doku_pref('approve_viewmode', false)) return false;
+
         if (!$this->getConf('hide_drafts_for_viewers')) return true;
 
         if (auth_quickaclcheck($id) >= AUTH_EDIT) return true;

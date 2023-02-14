@@ -14,10 +14,10 @@ class ViewModeSiteTools extends AbstractItem {
         $viewmode = get_doku_pref('approve_viewmode', false);
         if ($viewmode) {
             $this->svg = DOKU_INC . 'lib/plugins/approve/toggle-on-solid.svg';
-            $this->label = $helper->getLang('btn_edit_mode');
+            $this->label = $helper->getLang('btn_view_mode');
         } else {
             $this->svg = DOKU_INC . 'lib/plugins/approve/toggle-off-solid.svg';
-            $this->label = $helper->getLang('btn_view_mode');
+            $this->label = $helper->getLang('btn_edit_mode');
         }
     }
 }

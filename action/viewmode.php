@@ -14,7 +14,7 @@ use dokuwiki\plugin\approve\meta\ViewModeSiteTools;
  * @author     Anika Henke <anika@selfthinker.org>
  */
 
-class action_plugin_approve_editmode extends DokuWiki_Action_Plugin
+class action_plugin_approve_viewmode extends DokuWiki_Action_Plugin
 {
     /** @inheritdoc */
     function register(Doku_Event_Handler $controller)
@@ -26,6 +26,7 @@ class action_plugin_approve_editmode extends DokuWiki_Action_Plugin
 
     public function handleAct(Doku_Event $event)
     {
+        if (!$this->getConf('viewmode')) return;
         if ($event->data != 'viewmodesitetools' && $event->data != 'viewmodeedit') return;
         $viewmode = get_doku_pref('approve_viewmode', false);
         set_doku_pref('approve_viewmode', !$viewmode);  // toggle status
@@ -41,7 +42,7 @@ class action_plugin_approve_editmode extends DokuWiki_Action_Plugin
     public function addSiteTools(Doku_Event $event)
     {
         global $INPUT;
-
+        if (!$this->getConf('viewmode')) return false;
         if (!$INPUT->server->str('REMOTE_USER')) return false;
         if ($event->data['view'] != 'user') return false;
 
@@ -53,7 +54,7 @@ class action_plugin_approve_editmode extends DokuWiki_Action_Plugin
     public function addPageTools(Doku_Event $event)
     {
         global $INPUT;
-
+        if (!$this->getConf('viewmode')) return false;
         if (!$INPUT->server->str('REMOTE_USER')) return false;
         if ($event->data['view'] != 'page') return false;
 

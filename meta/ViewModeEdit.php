@@ -13,6 +13,6 @@ class ViewModeEdit extends AbstractItem {
 
         $this->svg = DOKU_INC . 'lib/plugins/approve/circle-edit-outline.svg';
         $this->label = $helper->getLang('btn_edit_mode');
-        $this->accesskey = 'z';
+        $this->accesskey = 'e'; // it replaces the edit button, so the same access key.
     }
 }

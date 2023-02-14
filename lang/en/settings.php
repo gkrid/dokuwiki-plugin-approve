@@ -5,4 +5,5 @@ $lang['ready_for_approval'] = 'Enable intermediate state "mark ready for approva
 $lang['strict_approver'] = 'Only approvers can approve their pages.';
 $lang['hide_drafts_for_viewers'] = 'Hide draft from users without edit permission and show the latest approved revision instead.';
 $lang['display_banner_for_readonly'] = 'Display banner for users with AUTH_READ only.';
-$lang['banner_long'] = 'Long banner including version number and approver';
+$lang['banner_long'] = 'Long banner including version number and approver.';
+$lang['viewmode'] = 'Enables View/Edit mode toggle button. In view mode no one can see drafts.';
