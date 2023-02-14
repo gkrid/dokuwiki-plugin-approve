@@ -241,7 +241,18 @@ class helper_plugin_approve extends DokuWiki_Plugin {
      * @return bool
      */
     public function client_can_mark_ready_for_approval($id) {
-        return auth_quickaclcheck($id) >= AUTH_EDIT;
+        global $INFO;
+
+        $ready_for_approval_acl = preg_split('/\s+/', $this->getConf('ready_for_approval_acl'), -1, PREG_SPLIT_NO_EMPTY);
+        if (count($ready_for_approval_acl) == 0) return auth_quickaclcheck($id) >= AUTH_EDIT; // empty
+        foreach ($ready_for_approval_acl as $user_or_group) {
+            if ($user_or_group[0] == '@' && $this->isInGroup($INFO['userinfo'], $user_or_group)) {
+                return true;
+            } elseif ($user_or_group == $INFO['client']) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

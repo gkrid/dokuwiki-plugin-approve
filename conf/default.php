@@ -12,4 +12,6 @@ $conf['hide_drafts_for_viewers'] = 1;
 
 $conf['display_banner_for_readonly'] = 1;
 $conf['banner_long'] = 1;
+
 $conf['viewmode'] = 0;
+$conf['ready_for_approval_acl'] = '';

@@ -7,3 +7,4 @@ $meta['banner_long'] = array('onoff');
 $meta['strict_approver'] = array('onoff', '_caution' => 'security');
 $meta['hide_drafts_for_viewers'] = array('onoff', '_caution' => 'security');
 $meta['viewmode'] = array('onoff');
+$meta['ready_for_approval_acl'] = array('string');
