@@ -217,7 +217,7 @@ class syntax_plugin_approve_table extends DokuWiki_Syntax_Plugin {
 
             $all += 1;
             if ($approved) {
-                $class = 'plugin__approve_green';
+                $class = 'plugin__approve_approved';
                 $state = $this->getLang('approved');
                 $date = $approved;
                 $by = $approved_by;
@@ -231,7 +231,7 @@ class syntax_plugin_approve_table extends DokuWiki_Syntax_Plugin {
 
                 $all_approved_ready += 1;
             } else {
-                $class = 'plugin__approve_red';
+                $class = 'plugin__approve_draft';
                 $state = $this->getLang('draft');
                 $date = $rev;
                 $by = p_get_metadata($id, 'last_change user');

@@ -211,18 +211,21 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
                                 WHERE page=? AND rev=?', $INFO['id'], $rev);
 
         $approve = $sqlite->res_fetch_assoc($res);
+        $last_approved_rev = $helper->find_last_approved($sqlite, $INFO['id']);
 
         $classes = [];
         if ($this->getConf('prettyprint')) {
             $classes[] = 'plugin__approve_noprint';
         }
 
-        if ($approve['approved']) {
-            $classes[] = 'plugin__approve_green';
+        if ($approve['approved'] && $rev == $last_approved_rev) {
+            $classes[] = 'plugin__approve_approved';
+        } elseif ($approve['approved']) {
+                $classes[] = 'plugin__approve_old_approved';
         } elseif ($this->getConf('ready_for_approval') && $approve['ready_for_approval']) {
             $classes[] = 'plugin__approve_ready';
         } else {
-            $classes[] = 'plugin__approve_red';
+            $classes[] = 'plugin__approve_draft';
         }
 
         ptln('<div id="plugin__approve" class="' . implode(' ', $classes) . '">');

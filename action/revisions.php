@@ -32,7 +32,11 @@ class action_plugin_approve_revisions extends DokuWiki_Action_Plugin {
                                 FROM revision
                                 WHERE page=?', $INFO['id']);
         $approve_revisions = $sqlite->res2arr($res);
+        $last_approved_rev = max(array_column(array_filter($approve_revisions, function ($v) {
+            return $v['approved'] != null;
+        }), 'rev'));
         $approve_revisions = array_combine(array_column($approve_revisions, 'rev'), $approve_revisions);
+
 
 		$parent_div_position = -1;
 		for ($i = 0; $i < $event->data->elementCount(); $i++) {
@@ -47,13 +51,15 @@ class action_plugin_approve_revisions extends DokuWiki_Action_Plugin {
                     $revision = $INFO['meta']['date']['modified'];
                 }
                 if (!isset($approve_revisions[$revision])) {
-                    $class =  'plugin__approve_red';
+                    $class =  'plugin__approve_draft';
+                } elseif ($approve_revisions[$revision]['approved'] && $revision == $last_approved_rev) {
+                    $class =  'plugin__approve_approved';
                 } elseif ($approve_revisions[$revision]['approved']) {
-                    $class =  'plugin__approve_green';
+                    $class =  'plugin__approve_old_approved';
                 } elseif ($this->getConf('ready_for_approval') && $approve_revisions[$revision]['ready_for_approval']) {
                     $class =  'plugin__approve_ready';
                 } else {
-                    $class =  'plugin__approve_red';
+                    $class =  'plugin__approve_draft';
                 }
 
                 $parent_div = $event->data->getElementAt($parent_div_position);
