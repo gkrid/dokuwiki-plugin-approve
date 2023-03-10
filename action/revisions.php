@@ -32,9 +32,13 @@ class action_plugin_approve_revisions extends DokuWiki_Action_Plugin {
                                 FROM revision
                                 WHERE page=?', $INFO['id']);
         $approve_revisions = $sqlite->res2arr($res);
-        $last_approved_rev = max(array_column(array_filter($approve_revisions, function ($v) {
-            return $v['approved'] != null;
-        }), 'rev'));
+        $last_approved_rev = null;
+        if (count($approve_revisions) > 1) {
+            $last_approved_rev = max(array_column(array_filter($approve_revisions, function ($v) {
+                return $v['approved'] != null;
+            }), 'rev'));
+        }
+
         $approve_revisions = array_combine(array_column($approve_revisions, 'rev'), $approve_revisions);
 
 
