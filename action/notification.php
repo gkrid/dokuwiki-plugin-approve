@@ -55,10 +55,14 @@ class action_plugin_approve_notification extends DokuWiki_Action_Plugin
 
         $user = $event->data['user'];
 
+        $is_ready_for_approval = '';
+        if ($this->getConf('ready_for_approval_notification')) {
+            $is_ready_for_approval = 'AND revision.ready_for_approval IS NOT NULL';
+        }
         $q = 'SELECT page.page, revision.rev
                     FROM page INNER JOIN revision ON page.page = revision.page
                     WHERE page.hidden = 0 AND page.approver=?
-                      AND revision.current=1 AND revision.approved IS NULL';
+                      AND revision.current=1 AND revision.approved IS NULL ' . $is_ready_for_approval;
         $res = $sqlite->query($q, $user);
 
         $notifications = $sqlite->res2arr($res);
