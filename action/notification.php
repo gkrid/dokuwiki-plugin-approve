@@ -1,5 +1,7 @@
 <?php
 // must be run within DokuWiki
+use dokuwiki\plugin\approve\meta\ApproveMetadata;
+
 if (!defined('DOKU_INC')) die();
 
 if (!defined('DOKU_PLUGIN')) define('DOKU_PLUGIN', DOKU_INC . 'lib/plugins/');
@@ -44,28 +46,20 @@ class action_plugin_approve_notification extends DokuWiki_Action_Plugin
     {
         if (!in_array('approve', $event->data['plugins'])) return;
 
+        $user = $event->data['user'];
         try {
-            /** @var \helper_plugin_approve_db $db_helper */
-            $db_helper = plugin_load('helper', 'approve_db');
-            $sqlite = $db_helper->getDB();
+            $approveMetadata = new ApproveMetadata();
         } catch (Exception $e) {
             msg($e->getMessage(), -1);
             return;
         }
 
-        $user = $event->data['user'];
-
-        $is_ready_for_approval = '';
+        $states = ['draft', 'ready_for_approval'];
         if ($this->getConf('ready_for_approval_notification')) {
-            $is_ready_for_approval = 'AND revision.ready_for_approval IS NOT NULL';
+            $states = ['ready_for_approval'];
         }
-        $q = 'SELECT page.page, revision.rev
-                    FROM page INNER JOIN revision ON page.page = revision.page
-                    WHERE page.hidden = 0 AND page.approver=?
-                      AND revision.current=1 AND revision.approved IS NULL ' . $is_ready_for_approval;
-        $res = $sqlite->query($q, $user);
 
-        $notifications = $sqlite->res2arr($res);
+        $notifications = $approveMetadata->getPages($user, $states);
 
         foreach ($notifications as $notification) {
             $page = $notification['page'];

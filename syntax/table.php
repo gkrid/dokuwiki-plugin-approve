@@ -1,6 +1,8 @@
 <?php
 
 // must be run within DokuWiki
+use dokuwiki\plugin\approve\meta\ApproveMetadata;
+
 if(!defined('DOKU_INC')) die();
 
 
@@ -32,7 +34,7 @@ class syntax_plugin_approve_table extends DokuWiki_Syntax_Plugin {
         $params = [
             'namespace' => '',
             'filter' => false,
-            'states' => [],
+            'states' => $this->states,
             'summarize' => true,
             'approver' => null
         ];
@@ -127,9 +129,7 @@ class syntax_plugin_approve_table extends DokuWiki_Syntax_Plugin {
         global $auth;
 
         try {
-            /** @var \helper_plugin_approve_db $db_helper */
-            $db_helper = plugin_load('helper', 'approve_db');
-            $sqlite = $db_helper->getDB();
+            $approveMetadata = new ApproveMetadata();
         } catch (Exception $e) {
             msg($e->getMessage(), -1);
             return;
@@ -139,45 +139,7 @@ class syntax_plugin_approve_table extends DokuWiki_Syntax_Plugin {
             $params['approver'] = $INFO['client'];
         }
 
-        $approver_query = '';
-        $query_args = [$params['namespace'].'*'];
-        if ($params['approver']) {
-            $approver_query .= " AND page.approver LIKE ?";
-            $query_args[] = $params['approver'];
-        }
-
-        if ($params['filter']) {
-            $approver_query .= " AND page.page REGEXP ?";
-            $query_args[] = $params['filter'];
-        }
-
-        //if all 3 states are enabled nothing is filtered
-        if ($params['states'] && count($params['states']) < 3) {
-            if ($this->array_equal(['draft'], $params['states'])) {
-                $approver_query .= " AND revision.ready_for_approval IS NULL AND revision.approved IS NULL";
-            } elseif ($this->array_equal(['ready_for_approval'], $params['states'])) {
-                $approver_query .= " AND revision.ready_for_approval IS NOT NULL AND revision.approved IS NULL";
-            } elseif ($this->array_equal(['approved'], $params['states'])) {
-                $approver_query .= " AND revision.approved IS NOT NULL";
-            } elseif ($this->array_equal(['draft', 'ready_for_approval'], $params['states'])) {
-                $approver_query .= " AND revision.approved IS NULL";
-            } elseif ($this->array_equal(['draft', 'approved'], $params['states'])) {
-                $approver_query .= " AND (revision.approved IS NOT NULL OR (revision.approved IS NULL AND revision.ready_for_approval IS NULL))";
-            } elseif ($this->array_equal(['ready_for_approval', 'approved'], $params['states'])) {
-                $approver_query .= " AND (revision.ready_for_approval IS NOT NULL OR revision.approved IS NOT NULL)";
-            }
-        }
-
-        $q = "SELECT page.page, page.approver, revision.rev, revision.approved, revision.approved_by,
-                    revision.ready_for_approval, revision.ready_for_approval_by,
-                    LENGTH(page.page) - LENGTH(REPLACE(page.page, ':', '')) AS colons
-                    FROM page INNER JOIN revision ON page.page = revision.page
-                    WHERE page.hidden = 0 AND revision.current=1 AND page.page GLOB ?
-                            $approver_query
-                    ORDER BY colons, page.page";
-
-        $res = $sqlite->query($q, $query_args);
-        $pages = $sqlite->res2arr($res);
+        $pages = $approveMetadata->getPages($params['approver'], $params['states'], $params['namespace'], $params['filter']);
 
         // Output Table
         $renderer->doc .= '<table><tr>';

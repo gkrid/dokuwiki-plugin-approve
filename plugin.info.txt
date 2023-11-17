@@ -1,7 +1,7 @@
 base approve
 author Szymon Olewniczak
 email it@rid.pl
-date 2022-03-29
+date 2023-11-17
 name approve
 desc Page approval mechanism for dokuwiki.
 url https://www.dokuwiki.org/plugin:approve
