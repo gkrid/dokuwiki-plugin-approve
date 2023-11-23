@@ -1,5 +1,7 @@
 <?php
 
+use \dokuwiki\ChangeLog\MediaChangeLog;
+
 if(!defined('DOKU_INC')) die();
 
 class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
@@ -410,7 +412,10 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
                 if ($rev) {
                     $sqlite->query('UPDATE revision SET rev=? WHERE page=? AND rev=?',
                         $last_change_date, $id, $rev);
-
+                    // remove tracking of media files for previous revision
+                    $sqlite->query('DELETE FROM media_revision WHERE page=? AND rev=?', $id, $rev);
+                    // track media files for current revision
+                    $this->storePageMediaRevisions($sqlite, $id, $last_change_date);
                 } else {
                     //keep previous record
                     $sqlite->query('UPDATE revision SET current=0
@@ -422,6 +427,7 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
                         'rev' => $last_change_date,
                         'current' => 1
                     ]);
+                    $this->storePageMediaRevisions($sqlite, $id, $last_change_date);
                 }
                 break;
             case DOKU_CHANGE_TYPE_DELETE:
@@ -432,10 +438,10 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
                 $rev = $this->lastRevisionHasntApprovalData($id);
                 if ($rev) {
                     $sqlite->query('DELETE FROM revision WHERE page=? AND rev=?', $id, $rev);
+                    $sqlite->query('DELETE FROM media_revision WHERE page=? AND rev=?', $id, $rev);
                 } else {
                     $sqlite->query('UPDATE revision SET current=0 WHERE page=? AND current=1', $id);
                 }
-
                 break;
             case DOKU_CHANGE_TYPE_CREATE:
                 if ($helper->isPageAssigned($sqlite, $id, $newApprover)) {
@@ -456,7 +462,25 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
                     'rev' => $last_change_date,
                     'current' => 1
                 ]);
+                $this->storePageMediaRevisions($sqlite, $id, $last_change_date);
                 break;
+        }
+    }
+
+    protected function storePageMediaRevisions($sqlite, $id, $last_change_date) {
+        // store revisions for media files
+        $media = p_get_metadata($id, 'relation media');
+        foreach ($media as $media_id => $exists) {
+            if ($exists) {
+                $changelog = new MediaChangeLog($media_id);
+                $media_rev = $changelog->currentRevision();
+                $sqlite->storeEntry('media_revision', [
+                    'page' => $id,
+                    'rev' => $last_change_date,
+                    'media' => $media_id,
+                    'media_rev' => $media_rev
+                ]);
+            }
         }
     }
 }
