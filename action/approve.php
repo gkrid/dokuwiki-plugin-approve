@@ -1,6 +1,7 @@
 <?php
 
 use \dokuwiki\ChangeLog\MediaChangeLog;
+use dokuwiki\plugin\approve\meta\ApproveMetadata;
 
 if(!defined('DOKU_INC')) die();
 
@@ -16,6 +17,7 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
         $controller->register_hook('ACTION_ACT_PREPROCESS', 'BEFORE', $this, 'handle_viewer');
         $controller->register_hook('TPL_ACT_RENDER', 'BEFORE', $this, 'handle_display_banner');
         $controller->register_hook('COMMON_WIKIPAGE_SAVE', 'AFTER', $this, 'handle_pagesave_after');
+        $controller->register_hook('MEDIA_UPLOAD_FINISH', 'AFTER', $this, 'handle_media_upload_finish_after');
     }
 
     /**
@@ -101,11 +103,22 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
         if (!$next_version) {
             $next_version = 1;
         }
+        $approved = date('c');
         //approved IS NULL prevents from overriding already approved page
         $sqlite->query('UPDATE revision
                         SET approved=?, approved_by=?, version=?
                         WHERE page=? AND current=1 AND approved IS NULL',
-                        date('c'), $INFO['client'], $next_version, $INFO['id']);
+            $approved, $INFO['client'], $next_version, $INFO['id']);
+
+        // approve all related media files
+        $res = $sqlite->query('SELECT rev FROM revision WHERE page=? AND current=1', $INFO['id']);
+        $rev = $sqlite->res2single($res);
+
+        $res = $sqlite->query('UPDATE media_revision SET approved=?
+                                        WHERE page=? AND rev=? AND approved IS NULL', $approved, $INFO['id'], $rev);
+
+        return $sqlite->res2single($res);
+
 
         header('Location: ' . wl($INFO['id']));
     }
@@ -198,6 +211,13 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
         /** @var helper_plugin_approve $helper */
         $helper = plugin_load('helper', 'approve');
 
+        try {
+            $approve_metadata = new ApproveMetadata();
+        } catch (Exception $e) {
+            msg($e->getMessage(), -1);
+            return false;
+        }
+
         if ($event->data != 'show') return;
         if (!$INFO['exists']) return;
         if (!$helper->use_approve_here($sqlite, $INFO['id'], $approver)) return;
@@ -206,13 +226,7 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
         $last_change_date = @filemtime(wikiFN($INFO['id']));
         $rev = !$INFO['rev'] ? $last_change_date : $INFO['rev'];
 
-
-        $res = $sqlite->query('SELECT ready_for_approval, ready_for_approval_by,
-                                        approved, approved_by, version
-                                FROM revision
-                                WHERE page=? AND rev=?', $INFO['id'], $rev);
-
-        $approve = $sqlite->res_fetch_assoc($res);
+        $approve = $approve_metadata->getPageStatus($INFO['id'], $rev);
         $last_approved_rev = $helper->find_last_approved($sqlite, $INFO['id']);
 
         $classes = [];
@@ -482,5 +496,40 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
                 ]);
             }
         }
+    }
+
+    public function handle_media_upload_finish_after(Doku_Event $event) {
+        try {
+            /** @var \helper_plugin_approve_db $db_helper */
+            $db_helper = plugin_load('helper', 'approve_db');
+            $sqlite = $db_helper->getDB();
+        } catch (Exception $e) {
+            msg($e->getMessage(), -1);
+            return false;
+        }
+
+        $media_id = $event->data[2];
+        $exists = $event->data[4];
+        // upload new file - nothing to do
+        if (!$exists) return true;
+
+        $res = $sqlite->query('SELECT revision.page, revision.rev FROM revision JOIN media_revision
+                                    ON revision.page=media_revision.page AND revision.rev=media_revision.rev
+                                        WHERE media=?
+                                          AND current=1
+                                          AND (revision.approved IS NOT NULL OR
+                                            revision.ready_for_approval IS NOT NULL)', $media_id);
+        $pages = $sqlite->res2arr($res);
+        foreach ($pages as $page) {
+            $changelog = new MediaChangeLog($media_id);
+            $media_rev = $changelog->currentRevision();
+            $sqlite->storeEntry('media_revision', [
+                'page' => $page['page'],
+                'rev' => $page['rev'],
+                'media' => $media_id,
+                'media_rev' => $media_rev
+            ]);
+        }
+        return true;
     }
 }

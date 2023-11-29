@@ -56,4 +56,20 @@ class ApproveMetadata
 
         return $pages;
     }
+
+    public function getPageStatus($id, $rev, $media_approve=false) {
+        $sql = 'SELECT ready_for_approval, ready_for_approval_by,
+                                        approved, approved_by, version
+                                FROM revision
+                                WHERE page=? AND rev=?';
+        $status = $this->db->queryRecord($sql, $id, $rev);
+        if ($media_approve) {
+            $sql = 'SELECT ready_for_approval, approved
+                                FROM media_revision
+                                WHERE page=? AND rev=?';
+            $media_status = $this->db->queryRecord($sql, $id, $rev);
+
+        }
+        return $status;
+    }
 }

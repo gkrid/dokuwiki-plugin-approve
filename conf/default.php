@@ -16,3 +16,4 @@ $conf['banner_long'] = 1;
 $conf['viewmode'] = 0;
 $conf['ready_for_approval_acl'] = '';
 $conf['ready_for_approval_notification'] = 0;
+$conf['media_approve'] = 0;
