@@ -2,6 +2,7 @@
 
 use \dokuwiki\ChangeLog\MediaChangeLog;
 use dokuwiki\plugin\approve\meta\ApproveMetadata;
+use dokuwiki\Ui\MediaDiff;
 
 if(!defined('DOKU_INC')) die();
 
@@ -11,6 +12,8 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
      */
     public function register(Doku_Event_Handler $controller) {
         $controller->register_hook('TPL_ACT_RENDER', 'AFTER', $this, 'handle_diff_accept');
+        $controller->register_hook('ACTION_ACT_PREPROCESS', 'BEFORE', $this, 'handle_media_diff_accept');
+        $controller->register_hook('TPL_ACT_RENDER', 'BEFORE', $this, 'display_media_diff_accept');
         $controller->register_hook('HTML_SHOWREV_OUTPUT', 'BEFORE', $this, 'handle_showrev');
         $controller->register_hook('ACTION_ACT_PREPROCESS', 'BEFORE', $this, 'handle_approve');
         $controller->register_hook('ACTION_ACT_PREPROCESS', 'BEFORE', $this, 'handle_mark_ready_for_approval');
@@ -48,6 +51,58 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
             $href = wl($INFO['id'], ['ready_for_approval' => 'ready_for_approval']);
             ptln('<a href="' . $href . '">'.$this->getLang('approve_ready').'</a>');
         }
+    }
+
+    public function handle_media_diff_accept(Doku_Event $event) {
+        global $ID, $INFO, $INPUT;
+        if ($event->data == 'approve_media_diff') {
+            $event->preventDefault();
+        } elseif ($event->data == 'approve_media') {
+            $event->preventDefault();
+            try {
+                /** @var \helper_plugin_approve_db $db_helper */
+                $db_helper = plugin_load('helper', 'approve_db');
+                $sqlite = $db_helper->getDB();
+            } catch (Exception $e) {
+                msg($e->getMessage(), -1);
+                return;
+            }
+
+            // TODO: check for ACL Here || Should we change version?
+            $approved = date('c');
+            $res = $sqlite->query('SELECT MAX(version)+1 FROM revision
+                                        WHERE page=?', $ID);
+            $next_version = $sqlite->res2single($res);
+            if (!$next_version) {
+                $next_version = 1;
+            }
+            $media_id = $INPUT->str('media_id');
+            $last_media_change_date = @filemtime(mediaFN($media_id));
+            $sqlite->query('UPDATE revision
+                        SET approved=?, approved_by=?, version=?, media_rev=?
+                        WHERE page=? AND current=1',
+                $approved, $INFO['client'], $next_version, $last_media_change_date, $INFO['id']);
+
+            header('Location: ' . wl($INFO['id']));
+
+        }
+        return true;
+    }
+    public function display_media_diff_accept(Doku_Event $event) {
+        global $ID, $REV, $INPUT;
+        if ($event->data == 'approve_media_diff') {
+            $event->preventDefault();
+            $media_id = $INPUT->str('media_id');
+            $media_diff = new MediaDiff($media_id);
+            $media_diff->show();
+
+            $href = wl($ID, ['do' => 'approve_media',
+                'media_id' => $media_id,
+                'rev' => $REV]);
+            ptln('<a href="' . $href . '">'.$this->getLang('approve').'</a>');
+
+        }
+        return true;
     }
 
     /**
@@ -109,16 +164,6 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
                         SET approved=?, approved_by=?, version=?
                         WHERE page=? AND current=1 AND approved IS NULL',
             $approved, $INFO['client'], $next_version, $INFO['id']);
-
-        // approve all related media files
-        $res = $sqlite->query('SELECT rev FROM revision WHERE page=? AND current=1', $INFO['id']);
-        $rev = $sqlite->res2single($res);
-
-        $res = $sqlite->query('UPDATE media_revision SET approved=?
-                                        WHERE page=? AND rev=? AND approved IS NULL', $approved, $INFO['id'], $rev);
-
-        return $sqlite->res2single($res);
-
 
         header('Location: ' . wl($INFO['id']));
     }
@@ -226,7 +271,7 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
         $last_change_date = @filemtime(wikiFN($INFO['id']));
         $rev = !$INFO['rev'] ? $last_change_date : $INFO['rev'];
 
-        $approve = $approve_metadata->getPageStatus($INFO['id'], $rev);
+        $approve = $approve_metadata->getPageStatus($INFO['id'], $last_change_date, $rev, $this->getConf('media_approve'));
         $last_approved_rev = $helper->find_last_approved($sqlite, $INFO['id']);
 
         $classes = [];
@@ -251,6 +296,20 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
 
         if ($approve['approved']) {
             ptln('<strong>'.$this->getLang('approved').'</strong>');
+            if (isset($approve['outdated_media_id'])) {
+                if ($helper->client_can_approve($INFO['id'], $approver)) {
+                    $urlParameters = [
+                        'media_id' => $approve['outdated_media_id'],
+                        'rev' => $approve['outdated_media_rev'],
+                        'do' => 'approve_media_diff',
+                    ];
+                    ptln('<a href="' . wl($INFO['id'], $urlParameters) . '">');
+                    ptln('(media outdated)' . $approve['outdated_media_id']);
+                    ptln('</a>');
+                } else {
+                    ptln('(media outdated)' . $approve['outdated_media_id']);
+                }
+            }
             ptln(' ' . dformat(strtotime($approve['approved'])));
 
             if($this->getConf('banner_long')) {
@@ -424,12 +483,8 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
                 //if the current page has approved or ready_for_approval -- keep it
                 $rev = $this->lastRevisionHasntApprovalData($id);
                 if ($rev) {
-                    $sqlite->query('UPDATE revision SET rev=? WHERE page=? AND rev=?',
-                        $last_change_date, $id, $rev);
-                    // remove tracking of media files for previous revision
-                    $sqlite->query('DELETE FROM media_revision WHERE page=? AND rev=?', $id, $rev);
-                    // track media files for current revision
-                    $this->storePageMediaRevisions($sqlite, $id, $last_change_date);
+                    $sqlite->query('UPDATE revision SET rev=? AND media_rev=? WHERE page=? AND rev=?',
+                        $last_change_date, $last_change_date, $id, $rev);
                 } else {
                     //keep previous record
                     $sqlite->query('UPDATE revision SET current=0
@@ -439,9 +494,9 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
                     $sqlite->storeEntry('revision', [
                         'page' => $id,
                         'rev' => $last_change_date,
+                        'media_rev' => $last_change_date,
                         'current' => 1
                     ]);
-                    $this->storePageMediaRevisions($sqlite, $id, $last_change_date);
                 }
                 break;
             case DOKU_CHANGE_TYPE_DELETE:
@@ -452,7 +507,6 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
                 $rev = $this->lastRevisionHasntApprovalData($id);
                 if ($rev) {
                     $sqlite->query('DELETE FROM revision WHERE page=? AND rev=?', $id, $rev);
-                    $sqlite->query('DELETE FROM media_revision WHERE page=? AND rev=?', $id, $rev);
                 } else {
                     $sqlite->query('UPDATE revision SET current=0 WHERE page=? AND current=1', $id);
                 }
@@ -474,31 +528,15 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
                 $sqlite->storeEntry('revision', [
                     'page' => $id,
                     'rev' => $last_change_date,
+                    'media_rev' => $last_change_date,
                     'current' => 1
                 ]);
-                $this->storePageMediaRevisions($sqlite, $id, $last_change_date);
                 break;
         }
     }
 
-    protected function storePageMediaRevisions($sqlite, $id, $last_change_date) {
-        // store revisions for media files
-        $media = p_get_metadata($id, 'relation media');
-        foreach ($media as $media_id => $exists) {
-            if ($exists) {
-                $changelog = new MediaChangeLog($media_id);
-                $media_rev = $changelog->currentRevision();
-                $sqlite->storeEntry('media_revision', [
-                    'page' => $id,
-                    'rev' => $last_change_date,
-                    'media' => $media_id,
-                    'media_rev' => $media_rev
-                ]);
-            }
-        }
-    }
-
     public function handle_media_upload_finish_after(Doku_Event $event) {
+        return;
         try {
             /** @var \helper_plugin_approve_db $db_helper */
             $db_helper = plugin_load('helper', 'approve_db');

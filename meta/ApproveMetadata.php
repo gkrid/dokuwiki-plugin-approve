@@ -2,6 +2,7 @@
 
 namespace dokuwiki\plugin\approve\meta;
 
+use dokuwiki\ChangeLog\MediaChangeLog;
 use dokuwiki\plugin\sqlite\SQLiteDB;
 use dokuwiki\Extension\AuthPlugin;
 
@@ -57,18 +58,35 @@ class ApproveMetadata
         return $pages;
     }
 
-    public function getPageStatus($id, $rev, $media_approve=false) {
-        $sql = 'SELECT ready_for_approval, ready_for_approval_by,
+    public function getPageStatus($id, $last_change_date, $rev, $media_approve=false) {
+        $sql = 'SELECT media_rev, ready_for_approval, ready_for_approval_by,
                                         approved, approved_by, version
                                 FROM revision
                                 WHERE page=? AND rev=?';
         $status = $this->db->queryRecord($sql, $id, $rev);
-        if ($media_approve) {
-            $sql = 'SELECT ready_for_approval, approved
-                                FROM media_revision
-                                WHERE page=? AND rev=?';
-            $media_status = $this->db->queryRecord($sql, $id, $rev);
-
+        // check if we don't have outdated media files - makes sens only for current page revision
+        if ($media_approve && $last_change_date == $rev) {
+            $media = p_get_metadata($id, 'relation media');
+            if (!is_array($media)) {
+                return $status;
+            }
+            $media_outdated = [];
+            foreach ($media as $media_id => $exists) {
+                if ($exists) {
+                    $changelog = new MediaChangeLog($media_id);
+                    $media_rev = $changelog->currentRevision();
+                    if ($media_rev > $status['media_rev']) {
+                        $media_outdated[$media_id] = $changelog->getRelativeRevision($status['media_rev'], -1);
+                    }
+                }
+            }
+            if ($media_outdated) {
+                // get the oldest outdated media
+                $media_rev = min($media_outdated);
+                $media_id = array_search($media_rev, $media_outdated);
+                $status['outdated_media_id'] = $media_id;
+                $status['outdated_media_rev'] = $media_rev;
+            }
         }
         return $status;
     }
