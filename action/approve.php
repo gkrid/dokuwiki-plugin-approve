@@ -159,11 +159,12 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
             $next_version = 1;
         }
         $approved = date('c');
+        $media_rev = time();
         //approved IS NULL prevents from overriding already approved page
         $sqlite->query('UPDATE revision
-                        SET approved=?, approved_by=?, version=?
+                        SET approved=?, approved_by=?, version=?, media_rev=?
                         WHERE page=? AND current=1 AND approved IS NULL',
-            $approved, $INFO['client'], $next_version, $INFO['id']);
+            $approved, $INFO['client'], $next_version, $media_rev, $INFO['id']);
 
         header('Location: ' . wl($INFO['id']));
     }
@@ -279,9 +280,9 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
             $classes[] = 'plugin__approve_noprint';
         }
 
-        if ($approve['approved'] && $rev == $last_approved_rev) {
+        if ($approve['approved'] && !isset($approve['outdated_media_id']) && $rev == $last_approved_rev) {
             $classes[] = 'plugin__approve_approved';
-        } elseif ($approve['approved']) {
+        } elseif ($approve['approved'] && !isset($approve['outdated_media_id'])) {
                 $classes[] = 'plugin__approve_old_approved';
         } elseif ($this->getConf('ready_for_approval') && $approve['ready_for_approval']) {
             $classes[] = 'plugin__approve_ready';
@@ -294,22 +295,22 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
 //		tpl_pageinfo();
 //		ptln(' | ');
 
-        if ($approve['approved']) {
+        if ($approve['approved'] && !isset($approve['outdated_media_id'])) {
             ptln('<strong>'.$this->getLang('approved').'</strong>');
-            if (isset($approve['outdated_media_id'])) {
-                if ($helper->client_can_approve($INFO['id'], $approver)) {
-                    $urlParameters = [
-                        'media_id' => $approve['outdated_media_id'],
-                        'rev' => $approve['outdated_media_rev'],
-                        'do' => 'approve_media_diff',
-                    ];
-                    ptln('<a href="' . wl($INFO['id'], $urlParameters) . '">');
-                    ptln('(media outdated)' . $approve['outdated_media_id']);
-                    ptln('</a>');
-                } else {
-                    ptln('(media outdated)' . $approve['outdated_media_id']);
-                }
-            }
+//            if (isset($approve['outdated_media_id'])) {
+//                if ($helper->client_can_approve($INFO['id'], $approver)) {
+//                    $urlParameters = [
+//                        'media_id' => $approve['outdated_media_id'],
+//                        'rev' => $approve['outdated_media_rev'],
+//                        'do' => 'approve_media_diff',
+//                    ];
+//                    ptln('<a href="' . wl($INFO['id'], $urlParameters) . '">');
+//                    ptln('(media outdated)' . $approve['outdated_media_id']);
+//                    ptln('</a>');
+//                } else {
+//                    ptln('(media outdated)' . $approve['outdated_media_id']);
+//                }
+//            }
             ptln(' ' . dformat(strtotime($approve['approved'])));
 
             if($this->getConf('banner_long')) {

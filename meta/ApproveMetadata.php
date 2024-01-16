@@ -59,8 +59,7 @@ class ApproveMetadata
     }
 
     public function getPageStatus($id, $last_change_date, $rev, $media_approve=false) {
-        $sql = 'SELECT media_rev, ready_for_approval, ready_for_approval_by,
-                                        approved, approved_by, version
+        $sql = 'SELECT ready_for_approval, ready_for_approval_by, approved, approved_by, version
                                 FROM revision
                                 WHERE page=? AND rev=?';
         $status = $this->db->queryRecord($sql, $id, $rev);
@@ -70,14 +69,24 @@ class ApproveMetadata
             if (!is_array($media)) {
                 return $status;
             }
+
+            $sql = 'SELECT media_id, MAX(media_rev), ready_for_approval, ready_for_approval_by, approved, approved_by, version
+                                FROM media_revision
+                                WHERE page=? AND rev=?
+                                GROUP BY media_id';
+            $media_revisions = $this->db->queryAll($sql, $id, $rev);
+            $media_revisions = array_combine(array_column($media_revisions, 'media_id'), $media_revisions);
+
             $media_outdated = [];
             foreach ($media as $media_id => $exists) {
                 if ($exists) {
                     $changelog = new MediaChangeLog($media_id);
                     $media_rev = $changelog->currentRevision();
-                    if ($media_rev > $status['media_rev']) {
-                        $media_outdated[$media_id] = $changelog->getRelativeRevision($status['media_rev'], -1);
-                    }
+
+//                    if ($media_rev > $status['media_rev']) {
+//                        // add "1" to get lower or equal revision
+//                        $media_outdated[$media_id] = $changelog->getRelativeRevision($status['media_rev']+1, -1);
+//                    }
                 }
             }
             if ($media_outdated) {
