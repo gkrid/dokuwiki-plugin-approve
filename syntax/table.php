@@ -129,7 +129,7 @@ class syntax_plugin_approve_table extends DokuWiki_Syntax_Plugin {
         global $auth;
 
         try {
-            $approveMetadata = new ApproveMetadata();
+            $approveMetadata = new ApproveMetadata($this->getConf('media_approve'));
         } catch (Exception $e) {
             msg($e->getMessage(), -1);
             return;
@@ -156,7 +156,7 @@ class syntax_plugin_approve_table extends DokuWiki_Syntax_Plugin {
 
         $curNS = '';
         foreach($pages as $page) {
-            $id = $page['page'];
+            $id = $page['id'];
             $approver = $page['approver'];
             $rev = $page['rev'];
             $approved = strtotime($page['approved']);

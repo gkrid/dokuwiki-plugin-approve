@@ -54,7 +54,7 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
     }
 
     public function handle_media_diff_accept(Doku_Event $event) {
-        global $ID, $INFO, $INPUT;
+        global $INFO, $INPUT;
         if ($event->data == 'approve_media_diff') {
             $event->preventDefault();
         } elseif ($event->data == 'approve_media') {
@@ -68,23 +68,57 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
                 return;
             }
 
-            // TODO: check for ACL Here || Should we change version?
-            $approved = date('c');
-            $res = $sqlite->query('SELECT MAX(version)+1 FROM revision
-                                        WHERE page=?', $ID);
-            $next_version = $sqlite->res2single($res);
-            if (!$next_version) {
-                $next_version = 1;
+            try {
+                $approve_metadata = new ApproveMetadata($this->getConf('media_approve'));
+            } catch (Exception $e) {
+                msg($e->getMessage(), -1);
+                return false;
             }
+
+            /** @var helper_plugin_approve $helper */
+            $helper = plugin_load('helper', 'approve');
+
+            if (!$helper->use_approve_here($sqlite, $INFO['id'], $approver)) return;
+
+            $approved = date('c');
             $media_id = $INPUT->str('media_id');
+            $status = $INPUT->str('status');
             $last_media_change_date = @filemtime(mediaFN($media_id));
-            $sqlite->query('UPDATE revision
-                        SET approved=?, approved_by=?, version=?, media_rev=?
-                        WHERE page=? AND current=1',
-                $approved, $INFO['client'], $next_version, $last_media_change_date, $INFO['id']);
+            $last_change_date = @filemtime(wikiFN($INFO['id']));
+            $entry = [
+                'page' =>  $INFO['id'],
+                'rev' => $last_change_date,
+                'media_id' => $media_id,
+                'media_rev' => $last_media_change_date
+            ];
+            if ($status == 'ready_for_approval') {
+                if (!$helper->client_can_mark_ready_for_approval($INFO['id'])) return;
+                $entry['ready_for_approval'] = $approved;
+                $entry['ready_for_approval_by'] = $INFO['client'];
+                $sqlite->storeEntry('media_revision', $entry);
+            } else {
+                if (!$helper->client_can_approve($INFO['id'], $approver)) return;
+                // check if the current revision of media file already exists
+                $res = $sqlite->query('SELECT * FROM media_revision
+                    WHERE page=? AND rev=? AND media_id=? AND media_rev=?',
+                    $INFO['id'], $last_change_date, $media_id, $last_media_change_date);
+                $media_revision = $sqlite->res2row($res);
+                if ($media_revision) {
+                    $sqlite->query('UPDATE media_revision
+                        SET approved=?, approved_by=?, version=?
+                        WHERE  page=? AND rev=? AND media_id=? AND media_rev=? AND approved IS NULL',
+                        $approved, $INFO['client'], $approve_metadata->getPageVersion($INFO['id'])+1,
+                        $INFO['id'], $last_change_date, $media_id, $last_media_change_date);
+                } else {
+                    $entry['approved'] = $approved;
+                    $entry['approved_by'] = $INFO['client'];
+                    $entry['version'] = $approve_metadata->getPageVersion($INFO['id'])+1;
+                    $sqlite->storeEntry('media_revision', $entry);
+                }
+
+            }
 
             header('Location: ' . wl($INFO['id']));
-
         }
         return true;
     }
@@ -93,13 +127,21 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
         if ($event->data == 'approve_media_diff') {
             $event->preventDefault();
             $media_id = $INPUT->str('media_id');
+            $status = $INPUT->str('status');
+
             $media_diff = new MediaDiff($media_id);
             $media_diff->show();
 
             $href = wl($ID, ['do' => 'approve_media',
+                'status' => $status,
                 'media_id' => $media_id,
                 'rev' => $REV]);
-            ptln('<a href="' . $href . '">'.$this->getLang('approve').'</a>');
+            if ($status == 'approve') {
+                $button = 'approve';
+            } elseif ($status == 'ready_for_approval') {
+                $button = 'approve_ready';
+            }
+            ptln('<a href="' . $href . '">'.$this->getLang($button).'</a>');
 
         }
         return true;
@@ -152,19 +194,19 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
         if (!$helper->use_approve_here($sqlite, $INFO['id'], $approver)) return;
         if (!$helper->client_can_approve($INFO['id'], $approver)) return;
 
-        $res = $sqlite->query('SELECT MAX(version)+1 FROM revision
-                                        WHERE page=?', $INFO['id']);
-        $next_version = $sqlite->res2single($res);
-        if (!$next_version) {
-            $next_version = 1;
+        try {
+            $approve_metadata = new ApproveMetadata($this->getConf('media_approve'));
+        } catch (Exception $e) {
+            msg($e->getMessage(), -1);
+            return false;
         }
+
         $approved = date('c');
-        $media_rev = time();
         //approved IS NULL prevents from overriding already approved page
         $sqlite->query('UPDATE revision
-                        SET approved=?, approved_by=?, version=?, media_rev=?
+                        SET approved=?, approved_by=?, version=?
                         WHERE page=? AND current=1 AND approved IS NULL',
-            $approved, $INFO['client'], $next_version, $media_rev, $INFO['id']);
+            $approved, $INFO['client'], $approve_metadata->getPageVersion($INFO['id'])+1, $INFO['id']);
 
         header('Location: ' . wl($INFO['id']));
     }
@@ -258,7 +300,7 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
         $helper = plugin_load('helper', 'approve');
 
         try {
-            $approve_metadata = new ApproveMetadata();
+            $approve_metadata = new ApproveMetadata($this->getConf('media_approve'));
         } catch (Exception $e) {
             msg($e->getMessage(), -1);
             return false;
@@ -272,7 +314,7 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
         $last_change_date = @filemtime(wikiFN($INFO['id']));
         $rev = !$INFO['rev'] ? $last_change_date : $INFO['rev'];
 
-        $approve = $approve_metadata->getPageStatus($INFO['id'], $last_change_date, $rev, $this->getConf('media_approve'));
+        $approve = $approve_metadata->getPageStatus($INFO['id'], $last_change_date, $rev);
         $last_approved_rev = $helper->find_last_approved($sqlite, $INFO['id']);
 
         $classes = [];
@@ -280,11 +322,11 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
             $classes[] = 'plugin__approve_noprint';
         }
 
-        if ($approve['approved'] && !isset($approve['outdated_media_id']) && $rev == $last_approved_rev) {
+        if ($approve['status'] == 'approved' && $rev == $last_approved_rev) {
             $classes[] = 'plugin__approve_approved';
-        } elseif ($approve['approved'] && !isset($approve['outdated_media_id'])) {
+        } elseif ($approve['status'] == 'approved') {
                 $classes[] = 'plugin__approve_old_approved';
-        } elseif ($this->getConf('ready_for_approval') && $approve['ready_for_approval']) {
+        } elseif ($this->getConf('ready_for_approval') && $approve['status'] == 'ready_for_approval') {
             $classes[] = 'plugin__approve_ready';
         } else {
             $classes[] = 'plugin__approve_draft';
@@ -295,27 +337,14 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
 //		tpl_pageinfo();
 //		ptln(' | ');
 
-        if ($approve['approved'] && !isset($approve['outdated_media_id'])) {
+        if ($approve['status'] == 'approved') {
             ptln('<strong>'.$this->getLang('approved').'</strong>');
-//            if (isset($approve['outdated_media_id'])) {
-//                if ($helper->client_can_approve($INFO['id'], $approver)) {
-//                    $urlParameters = [
-//                        'media_id' => $approve['outdated_media_id'],
-//                        'rev' => $approve['outdated_media_rev'],
-//                        'do' => 'approve_media_diff',
-//                    ];
-//                    ptln('<a href="' . wl($INFO['id'], $urlParameters) . '">');
-//                    ptln('(media outdated)' . $approve['outdated_media_id']);
-//                    ptln('</a>');
-//                } else {
-//                    ptln('(media outdated)' . $approve['outdated_media_id']);
-//                }
-//            }
             ptln(' ' . dformat(strtotime($approve['approved'])));
 
             if($this->getConf('banner_long')) {
                 ptln(' ' . $this->getLang('by') . ' ' . userlink($approve['approved_by'], true));
-                ptln(' (' . $this->getLang('version') .  ': ' . $approve['version'] . ')');
+                $version = $approve_metadata->getPageVersion($ID);
+                ptln(' (' . $this->getLang('version') .  ': ' . $version . ')');
             }
 
             //not the newest page
@@ -344,7 +373,7 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
             }
 
         } else {
-            if ($this->getConf('ready_for_approval') && $approve['ready_for_approval']) {
+            if ($this->getConf('ready_for_approval') && $approve['status'] == 'ready_for_approval') {
                 ptln('<strong>'.$this->getLang('marked_approve_ready').'</strong>');
                 ptln(' ' . dformat(strtotime($approve['ready_for_approval'])));
                 ptln(' ' . $this->getLang('by') . ' ' . userlink($approve['ready_for_approval_by'], true));
@@ -380,7 +409,6 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
 
             //we are in current page
             if ($rev == $last_change_date) {
-
                 //compare with the last approved page or 0 if there is no approved versions
                 $last_approved_rev = 0;
                 if (isset($last_approve['rev'])) {
@@ -389,25 +417,61 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
 
                 if ($this->getConf('ready_for_approval') &&
                     $helper->client_can_mark_ready_for_approval($INFO['id']) &&
-                    !$approve['ready_for_approval']) {
+                    $approve['status'] != 'ready_for_approval') {
 
-                    $urlParameters = [
-                        'rev' => $last_approved_rev,
-                        'do' => 'diff',
-                        'ready_for_approval' => 'ready_for_approval'
-                    ];
+                    if (isset($approve['outdated_media'])) { // we are in draft because of media
+                        $urlParameters = [
+                            'media_id' => $approve['outdated_media']['media_id'],
+                            'rev' => $approve['outdated_media']['media_rev'],
+                            'do' => 'approve_media_diff',
+                            'status' => 'ready_for_approval'
+                        ];
+                    } else {
+                        $urlParameters = [
+                            'rev' => $last_approved_rev,
+                            'do' => 'diff',
+                            'ready_for_approval' => 'ready_for_approval'
+                        ];
+                    }
+
                     ptln(' | <a href="'.wl($INFO['id'], $urlParameters).'">');
                     ptln($this->getLang('approve_ready'));
                     ptln('</a>');
                 }
 
-                if ($helper->client_can_approve($INFO['id'], $approver)) {
+                if ($helper->client_can_approve($INFO['id'], $approver) &&
+                    // if page is in RFA state and exists some outdated media, the media must be first marked RFA before
+                    // we can mark page as approved.
+                    !($approve['page_status'] == 'ready_for_approval' && isset($approve['outdated_media'])) &&
+                    // if page is in approved state but at least one media is in RFA state and one in draft,
+                    // the media must be first marked as RFA before we can mark page as approved
+                    !($approve['page_status'] == 'approved' && !empty($approve['media_drafts'])
+                        && !empty($approve['media_rfas']))) {
 
-                    $urlParameters = [
-                        'rev' => $last_approved_rev,
-                        'do' => 'diff',
-                        'approve' => 'approve'
-                    ];
+                    // the page is approved, but we have some draft media
+                    if ($approve['page_status'] == 'approved' && isset($approve['outdated_media'])) {
+                        $urlParameters = [
+                            'media_id' => $approve['outdated_media']['media_id'],
+                            'rev' => $approve['outdated_media']['media_rev'],
+                            'do' => 'approve_media_diff',
+                            'status' => 'approve'
+                        ];
+                    // the page is approved, but we have some rfa media
+                    } elseif ($approve['page_status'] == 'approved' && isset($approve['rfa_media'])) {
+                            $urlParameters = [
+                                'media_id' => $approve['rfa_media']['media_id'],
+                                'rev' => $approve['rfa_media']['media_rev'],
+                                'do' => 'approve_media_diff',
+                                'status' => 'approve'
+                            ];
+                    // the page is not approved
+                    } else {
+                        $urlParameters = [
+                            'rev' => $last_approved_rev,
+                            'do' => 'diff',
+                            'approve' => 'approve'
+                        ];
+                    }
                     ptln(' | <a href="'.wl($INFO['id'], $urlParameters).'">');
                     ptln($this->getLang('approve'));
                     ptln('</a>');
@@ -495,7 +559,6 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
                     $sqlite->storeEntry('revision', [
                         'page' => $id,
                         'rev' => $last_change_date,
-                        'media_rev' => $last_change_date,
                         'current' => 1
                     ]);
                 }
@@ -529,7 +592,6 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
                 $sqlite->storeEntry('revision', [
                     'page' => $id,
                     'rev' => $last_change_date,
-                    'media_rev' => $last_change_date,
                     'current' => 1
                 ]);
                 break;

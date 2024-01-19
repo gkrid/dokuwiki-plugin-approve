@@ -48,7 +48,7 @@ class action_plugin_approve_notification extends DokuWiki_Action_Plugin
 
         $user = $event->data['user'];
         try {
-            $approveMetadata = new ApproveMetadata();
+            $approveMetadata = new ApproveMetadata($this->getConf('media_approve'));
         } catch (Exception $e) {
             msg($e->getMessage(), -1);
             return;
@@ -62,7 +62,7 @@ class action_plugin_approve_notification extends DokuWiki_Action_Plugin
         $notifications = $approveMetadata->getPages($user, $states);
 
         foreach ($notifications as $notification) {
-            $page = $notification['page'];
+            $page = $notification['id'];
             $rev = $notification['rev'];
 
             $link = '<a class="wikilink1" href="' . wl($page, '', true) . '">';
