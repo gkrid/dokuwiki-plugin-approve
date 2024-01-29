@@ -80,44 +80,16 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
 
             if (!$helper->use_approve_here($sqlite, $INFO['id'], $approver)) return;
 
-            $approved = date('c');
             $media_id = $INPUT->str('media_id');
             $status = $INPUT->str('status');
-            $last_media_change_date = @filemtime(mediaFN($media_id));
-            $last_change_date = @filemtime(wikiFN($INFO['id']));
-            $entry = [
-                'page' =>  $INFO['id'],
-                'rev' => $last_change_date,
-                'media_id' => $media_id,
-                'media_rev' => $last_media_change_date
-            ];
             if ($status == 'ready_for_approval') {
                 if (!$helper->client_can_mark_ready_for_approval($INFO['id'])) return;
-                $entry['ready_for_approval'] = $approved;
-                $entry['ready_for_approval_by'] = $INFO['client'];
-                $sqlite->storeEntry('media_revision', $entry);
+                $approve_metadata->setMediaRfaStatus($INFO['id'], $media_id, $INFO['client']);
             } else {
                 if (!$helper->client_can_approve($INFO['id'], $approver)) return;
-                // check if the current revision of media file already exists
-                $res = $sqlite->query('SELECT * FROM media_revision
-                    WHERE page=? AND rev=? AND media_id=? AND media_rev=?',
-                    $INFO['id'], $last_change_date, $media_id, $last_media_change_date);
-                $media_revision = $sqlite->res2row($res);
-                if ($media_revision) {
-                    $sqlite->query('UPDATE media_revision
-                        SET approved=?, approved_by=?, version=?
-                        WHERE  page=? AND rev=? AND media_id=? AND media_rev=? AND approved IS NULL',
-                        $approved, $INFO['client'], $approve_metadata->getPageVersion($INFO['id'])+1,
-                        $INFO['id'], $last_change_date, $media_id, $last_media_change_date);
-                } else {
-                    $entry['approved'] = $approved;
-                    $entry['approved_by'] = $INFO['client'];
-                    $entry['version'] = $approve_metadata->getPageVersion($INFO['id'])+1;
-                    $sqlite->storeEntry('media_revision', $entry);
-                }
+                $approve_metadata->setMediaApprovedStatus($INFO['id'], $media_id, $INFO['client']);
 
             }
-
             header('Location: ' . wl($INFO['id']));
         }
         return true;

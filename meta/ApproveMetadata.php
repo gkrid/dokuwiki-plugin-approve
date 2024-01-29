@@ -199,4 +199,48 @@ class ApproveMetadata
 
         return max($max_page_version, $max_media_version, 0);
     }
+
+    public function setMediaRfaStatus($page_id, $media_id, $client)
+    {
+        $timestamp = date('c');
+        $last_media_change_date = @filemtime(mediaFN($media_id));
+        $last_page_change_date = @filemtime(wikiFN($page_id));
+        $data = [
+            'page' =>  $page_id,
+            'rev' => $last_page_change_date,
+            'media_id' => $media_id,
+            'media_rev' => $last_media_change_date,
+            'ready_for_approval' => $timestamp,
+            'ready_for_approval_by' => $client
+        ];
+        $this->db->saveRecord('media_revision', $data);
+    }
+
+    public function setMediaApprovedStatus($page_id, $media_id, $client)
+    {
+        $timestamp = date('c');
+        $last_media_change_date = @filemtime(mediaFN($media_id));
+        $last_page_change_date = @filemtime(wikiFN($page_id));
+        // check if the current revision of media file already exists
+        $sql = 'SELECT * FROM media_revision WHERE page=? AND rev=? AND media_id=? AND media_rev=?';
+        $media_revision = $this->db->queryRecord($sql,$page_id, $last_page_change_date, $media_id, $last_media_change_date);
+        if ($media_revision) {
+            $this->db->query('UPDATE media_revision
+                        SET approved=?, approved_by=?, version=?
+                        WHERE  page=? AND rev=? AND media_id=? AND media_rev=? AND approved IS NULL',
+                $timestamp, $client, $this->getPageVersion($page_id)+1,
+                $page_id, $last_page_change_date, $media_id, $last_media_change_date);
+        } else {
+            $data = [
+                'page' =>  $page_id,
+                'rev' => $last_page_change_date,
+                'media_id' => $media_id,
+                'media_rev' => $last_media_change_date,
+                'approved' => $timestamp,
+                'approved_by' => $client,
+                'version' => $this->getPageVersion($page_id)+1
+            ];
+            $this->db->saveRecord('media_revision', $data);
+        }
+    }
 }

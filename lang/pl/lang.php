@@ -38,3 +38,7 @@ $lang['js']['group_option_label'] = 'Grupa:';
 
 $lang['btn_view_mode'] = 'Tryb przeglądania';
 $lang['btn_edit_mode'] = 'Tryb edycji';
+
+// for media approve
+$lang['page'] = 'strona';
+$lang['media'] = 'multimedia';
