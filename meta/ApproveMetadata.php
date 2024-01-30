@@ -33,9 +33,7 @@ class ApproveMetadata
 
         // add status to the page
         $pages = array_map([$this, 'setPageStatus'], $pages);
-        if ($this->media_approve) {
-            $pages = array_map([$this, 'applyMediaApprove'], $pages);
-        }
+        $pages = array_map([$this, 'applyMediaApprove'], $pages);
 
         if ($user) {
             $user_data = $auth->getUserData($user);
@@ -52,6 +50,17 @@ class ApproveMetadata
         });
 
         return $pages;
+    }
+
+    public function getPageRevisions($page): array {
+        $sql = 'SELECT page AS id, rev, approved, approved_by, ready_for_approval, ready_for_approval_by
+                    FROM revision WHERE page=?';
+        $revisions = $this->db->queryAll($sql, $page);
+        // add status to the page
+        $revisions = array_map([$this, 'setPageStatus'], $revisions);
+        $revisions = array_map([$this, 'applyMediaApprove'], $revisions);
+
+        return $revisions;
     }
 
     protected function setPageStatus($page)
@@ -72,8 +81,9 @@ class ApproveMetadata
     {
         $id = $page['id'];
         $rev = $page['rev'];
-        // if page is a draft, no additional media check is needed
-        if ($page['status'] == 'draft') {
+        $last_change_date = @filemtime(wikiFN($id));
+        // if media approve is turned off, page is a draft, or it is not last revision, no additional media check is needed
+        if (!$this->media_approve || $page['status'] == 'draft' || $rev != $last_change_date) {
             return $page;
         }
 
@@ -126,46 +136,55 @@ class ApproveMetadata
         $ready_for_approval = array_filter($media_page_revisions, function ($media) {
             return $media['status'] == 'ready_for_approval';
         });
-        $page['media_rfas'] = $ready_for_approval;
+        $page['media_ready_for_approval'] = $ready_for_approval;
         if ($drafts) {
              // get the oldest outdated media
-            usort($drafts, function ($a ,$b) {
-                return $a['media_rev'] <=> $b['media_rev'];
-            });
-            $oldest_media = $drafts[0];
-            $page['outdated_media'] = $oldest_media;
+//            usort($drafts, function ($a ,$b) {
+//                return $a['media_rev'] <=> $b['media_rev'];
+//            });
+//            $oldest_media = $drafts[0];
+//            $page['outdated_media'] = $oldest_media;
             $page['status'] = 'draft';
         // at least one of media files is in rfa state
         } elseif ($ready_for_approval) {
             // update rfa metadata
-            usort($ready_for_approval, function ($a ,$b) {
-                return $a['ready_for_approval'] <=> $b['ready_for_approval'];
-            });
-            $media_with_latest_rfa = $ready_for_approval[count($ready_for_approval)-1];
+//            usort($ready_for_approval, function ($a ,$b) {
+//                return $a['ready_for_approval'] <=> $b['ready_for_approval'];
+//            });
+//            $latest_rfa_media = $ready_for_approval[count($ready_for_approval)-1];
+            $ready_for_approval_column = array_column($ready_for_approval,'ready_for_approval');
+            $max_ready_for_approval = max($ready_for_approval_column);
+            $media_with_max_ready_for_approval_id = array_search($max_ready_for_approval, $ready_for_approval_column);
+            $media_with_max_ready_for_approval = $ready_for_approval[$media_with_max_ready_for_approval_id];
 
             // get the oldest outdated media
-            usort($ready_for_approval, function ($a ,$b) {
-                return $a['media_rev'] <=> $b['media_rev'];
-            });
-            $page['rfa_media'] = $ready_for_approval[0];
+//            usort($ready_for_approval, function ($a ,$b) {
+//                return $a['media_rev'] <=> $b['media_rev'];
+//            });
+//            $page['rfa_media'] = $ready_for_approval[0];
 
-            $page['ready_for_approval'] = $media_with_latest_rfa['ready_for_approval'];
-            $page['ready_for_approval_by'] = $media_with_latest_rfa['ready_for_approval_by'];
+            $page['ready_for_approval'] = $media_with_max_ready_for_approval['ready_for_approval'];
+            $page['ready_for_approval_by'] = $media_with_max_ready_for_approval['ready_for_approval_by'];
             $page['status'] = 'ready_for_approval';
-        } elseif ($media_page_revisions) {
+        } elseif ($media_page_revisions) { // all media in $media_page_revisions are approved
             // if all media are approved page is also approved
-            uasort($media_page_revisions, function ($a ,$b) {
-                return $a['ready_for_approval'] <=> $b['ready_for_approval'];
-            });
-            $media_with_latest_approve = $media_page_revisions[count($media_page_revisions)-1];
-            $page['approved'] = $media_with_latest_approve['approved'];
-            $page['approved_by'] = $media_with_latest_approve['approved_by'];
+//            uasort($media_page_revisions, function ($a ,$b) {
+//                return $a['ready_for_approval'] <=> $b['ready_for_approval'];
+//            });
+//            $media_with_latest_approve = $media_page_revisions[count($media_page_revisions)-1];
+            $approved_column = array_column($media_page_revisions,'approved');
+            $max_approved = max($approved_column);
+            $media_with_max_approved_id = array_search($max_approved, $approved_column);
+            $media_with_max_approved = $media_page_revisions[$media_with_max_approved_id];
+
+            $page['approved'] = $media_with_max_approved['approved'];
+            $page['approved_by'] = $media_with_max_approved['approved_by'];
             $page['status'] = 'approved';
         }
         return $page;
     }
 
-    public function getPageStatus($id, $last_change_date, $rev): ?array
+    public function getPageRevision($id, $rev): ?array
     {
         $sql = 'SELECT ready_for_approval, ready_for_approval_by, approved, approved_by
                                 FROM revision
@@ -183,10 +202,25 @@ class ApproveMetadata
         $page['rev'] = $rev;
         $page = $this->setPageStatus($page);
         // check if we don't have outdated media files - makes sens only for current page revision
-        if ($this->media_approve && $last_change_date == $rev) {
-            $page = $this->applyMediaApprove($page);
-        }
+        $page = $this->applyMediaApprove($page);
         return $page;
+    }
+
+    public function getMediaRevisions($page_id, $page_rev)
+    {
+        $sql = 'SELECT ready_for_approval, ready_for_approval_by
+                    FROM media_revision
+                    WHERE page=? AND rev=?
+                    GROUP BY ready_for_approval, ready_for_approval_by';
+        $ready_for_approval = $this->db->queryAll($sql, $page_id, $page_rev);
+
+        $sql = 'SELECT approved, approved_by, version
+                    FROM media_revision
+                    WHERE page=? AND rev=?
+                    GROUP BY approved, approved_by, version';
+        $approved = $this->db->queryAll($sql, $page_id, $page_rev);
+
+        return $approved;
     }
 
     public function getPageVersion($id)
@@ -200,47 +234,55 @@ class ApproveMetadata
         return max($max_page_version, $max_media_version, 0);
     }
 
-    public function setMediaRfaStatus($page_id, $media_id, $client)
+    public function setMediaReadyForApprovalStatus($page_id, $client, $media_ids)
     {
         $timestamp = date('c');
-        $last_media_change_date = @filemtime(mediaFN($media_id));
         $last_page_change_date = @filemtime(wikiFN($page_id));
-        $data = [
-            'page' =>  $page_id,
-            'rev' => $last_page_change_date,
-            'media_id' => $media_id,
-            'media_rev' => $last_media_change_date,
-            'ready_for_approval' => $timestamp,
-            'ready_for_approval_by' => $client
-        ];
-        $this->db->saveRecord('media_revision', $data);
-    }
 
-    public function setMediaApprovedStatus($page_id, $media_id, $client)
-    {
-        $timestamp = date('c');
-        $last_media_change_date = @filemtime(mediaFN($media_id));
-        $last_page_change_date = @filemtime(wikiFN($page_id));
-        // check if the current revision of media file already exists
-        $sql = 'SELECT * FROM media_revision WHERE page=? AND rev=? AND media_id=? AND media_rev=?';
-        $media_revision = $this->db->queryRecord($sql,$page_id, $last_page_change_date, $media_id, $last_media_change_date);
-        if ($media_revision) {
-            $this->db->query('UPDATE media_revision
-                        SET approved=?, approved_by=?, version=?
-                        WHERE  page=? AND rev=? AND media_id=? AND media_rev=? AND approved IS NULL',
-                $timestamp, $client, $this->getPageVersion($page_id)+1,
-                $page_id, $last_page_change_date, $media_id, $last_media_change_date);
-        } else {
+        foreach ($media_ids as $media_id) {
+            $last_media_change_date = @filemtime(mediaFN($media_id));
             $data = [
-                'page' =>  $page_id,
+                'page' => $page_id,
                 'rev' => $last_page_change_date,
                 'media_id' => $media_id,
                 'media_rev' => $last_media_change_date,
-                'approved' => $timestamp,
-                'approved_by' => $client,
-                'version' => $this->getPageVersion($page_id)+1
+                'ready_for_approval' => $timestamp,
+                'ready_for_approval_by' => $client
             ];
             $this->db->saveRecord('media_revision', $data);
+        }
+    }
+
+    public function setMediaApprovedStatus($page_id, $client, $media_ids)
+    {
+        $timestamp = date('c');
+        $last_page_change_date = @filemtime(wikiFN($page_id));
+        $version = $this->getPageVersion($page_id)+1;
+
+        foreach ($media_ids as $media_id) {
+            $last_media_change_date = @filemtime(mediaFN($media_id));
+
+            // check if the current revision of media file already exists
+            $sql = 'SELECT * FROM media_revision WHERE page=? AND rev=? AND media_id=? AND media_rev=?';
+            $media_revision = $this->db->queryRecord($sql, $page_id, $last_page_change_date, $media_id, $last_media_change_date);
+            if ($media_revision) {
+                $this->db->query('UPDATE media_revision
+                            SET approved=?, approved_by=?, version=?
+                            WHERE page=? AND rev=? AND media_id=? AND media_rev=? AND approved IS NULL',
+                    $timestamp, $client, $version,
+                    $page_id, $last_page_change_date, $media_id, $last_media_change_date);
+            } else {
+                $data = [
+                    'page' => $page_id,
+                    'rev' => $last_page_change_date,
+                    'media_id' => $media_id,
+                    'media_rev' => $last_media_change_date,
+                    'approved' => $timestamp,
+                    'approved_by' => $client,
+                    'version' => $version
+                ];
+                $this->db->saveRecord('media_revision', $data);
+            }
         }
     }
 }

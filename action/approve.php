@@ -80,34 +80,38 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
 
             if (!$helper->use_approve_here($sqlite, $INFO['id'], $approver)) return;
 
-            $media_id = $INPUT->str('media_id');
+            $media = $INPUT->str('media');
+            $media = json_decode($media, true);
             $status = $INPUT->str('status');
-            if ($status == 'ready_for_approval') {
-                if (!$helper->client_can_mark_ready_for_approval($INFO['id'])) return;
-                $approve_metadata->setMediaRfaStatus($INFO['id'], $media_id, $INFO['client']);
-            } else {
-                if (!$helper->client_can_approve($INFO['id'], $approver)) return;
-                $approve_metadata->setMediaApprovedStatus($INFO['id'], $media_id, $INFO['client']);
-
+            if ($status == 'ready_for_approval' && $helper->client_can_mark_ready_for_approval($INFO['id'])) {
+                $approve_metadata->setMediaReadyForApprovalStatus($INFO['id'], $INFO['client'], array_keys($media));
+            } elseif ($helper->client_can_approve($INFO['id'], $approver)) {
+                $approve_metadata->setMediaApprovedStatus($INFO['id'], $INFO['client'], array_keys($media));
             }
             header('Location: ' . wl($INFO['id']));
         }
         return true;
     }
     public function display_media_diff_accept(Doku_Event $event) {
-        global $ID, $REV, $INPUT;
+        global $ID, $INPUT;
         if ($event->data == 'approve_media_diff') {
             $event->preventDefault();
-            $media_id = $INPUT->str('media_id');
+            $media = $INPUT->str('media');
+            $media_array = json_decode($media);
             $status = $INPUT->str('status');
 
-            $media_diff = new MediaDiff($media_id);
-            $media_diff->show();
+//            $media_diff = new MediaDiff($media_id);
+//            $media_diff->show();
+//            print('Decide?');
+            foreach ($media_array as $media_id => $prev_media_rev) {
+                $last_media_change_date = @filemtime(mediaFN($media_id));
+                print "$media_id: current: $prev_media_rev, new: $last_media_change_date<br>";
+            }
 
             $href = wl($ID, ['do' => 'approve_media',
                 'status' => $status,
-                'media_id' => $media_id,
-                'rev' => $REV]);
+                'media' => $media
+            ]);
             if ($status == 'approve') {
                 $button = 'approve';
             } elseif ($status == 'ready_for_approval') {
@@ -286,7 +290,7 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
         $last_change_date = @filemtime(wikiFN($INFO['id']));
         $rev = !$INFO['rev'] ? $last_change_date : $INFO['rev'];
 
-        $approve = $approve_metadata->getPageStatus($INFO['id'], $last_change_date, $rev);
+        $approve = $approve_metadata->getPageRevision($INFO['id'], $rev);
         $last_approved_rev = $helper->find_last_approved($sqlite, $INFO['id']);
 
         $classes = [];
@@ -391,10 +395,12 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
                     $helper->client_can_mark_ready_for_approval($INFO['id']) &&
                     $approve['status'] != 'ready_for_approval') {
 
-                    if (isset($approve['outdated_media'])) { // we are in draft because of media
+                    if (isset($approve['media_ready_for_approval'])) { // we are in draft because of media
+                        $media_drafts_ids = array_column($approve['media_drafts'], 'media_id');
+                        $media_drafts_revs = array_column($approve['media_drafts'], 'media_rev');
+                        $media_drafts = array_combine($media_drafts_ids, $media_drafts_revs);
                         $urlParameters = [
-                            'media_id' => $approve['outdated_media']['media_id'],
-                            'rev' => $approve['outdated_media']['media_rev'],
+                            'media' => json_encode($media_drafts),
                             'do' => 'approve_media_diff',
                             'status' => 'ready_for_approval'
                         ];
@@ -411,31 +417,43 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
                     ptln('</a>');
                 }
 
+//                if ($helper->client_can_approve($INFO['id'], $approver) &&
+//                    // if page is in RFA state and exists some outdated media, the media must be first marked RFA before
+//                    // we can mark page as approved.
+//                    !($approve['page_status'] == 'ready_for_approval' && isset($approve['outdated_media'])) &&
+//                    // if page is in approved state but at least one media is in RFA state and one in draft,
+//                    // the media must be first marked as RFA before we can mark page as approved
+//                    !($approve['page_status'] == 'approved' && !empty($approve['media_drafts'])
+//                        && !empty($approve['media_rfas']))) {
+
+                // if page_status is ready_for_approval and page is draft because of media,
+                // we must first mark all media as ready_for_approval
                 if ($helper->client_can_approve($INFO['id'], $approver) &&
-                    // if page is in RFA state and exists some outdated media, the media must be first marked RFA before
-                    // we can mark page as approved.
-                    !($approve['page_status'] == 'ready_for_approval' && isset($approve['outdated_media'])) &&
+                    !($approve['page_status'] == 'ready_for_approval' && !empty($approve['media_drafts'])) &&
                     // if page is in approved state but at least one media is in RFA state and one in draft,
                     // the media must be first marked as RFA before we can mark page as approved
                     !($approve['page_status'] == 'approved' && !empty($approve['media_drafts'])
-                        && !empty($approve['media_rfas']))) {
-
+                        && !empty($approve['media_ready_for_approval']))) {
                     // the page is approved, but we have some draft media
-                    if ($approve['page_status'] == 'approved' && isset($approve['outdated_media'])) {
+                    if ($approve['page_status'] == 'approved' && !empty($approve['media_drafts'])) {
+                        $media_drafts_ids = array_column($approve['media_drafts'], 'media_id');
+                        $media_drafts_revs = array_column($approve['media_drafts'], 'media_rev');
+                        $media_drafts = array_combine($media_drafts_ids, $media_drafts_revs);
                         $urlParameters = [
-                            'media_id' => $approve['outdated_media']['media_id'],
-                            'rev' => $approve['outdated_media']['media_rev'],
+                            'media' => json_encode($media_drafts),
                             'do' => 'approve_media_diff',
                             'status' => 'approve'
                         ];
                     // the page is approved, but we have some rfa media
-                    } elseif ($approve['page_status'] == 'approved' && isset($approve['rfa_media'])) {
-                            $urlParameters = [
-                                'media_id' => $approve['rfa_media']['media_id'],
-                                'rev' => $approve['rfa_media']['media_rev'],
-                                'do' => 'approve_media_diff',
-                                'status' => 'approve'
-                            ];
+                    } elseif ($approve['page_status'] == 'approved' && !empty($approve['media_ready_for_approval'])) {
+                        $media_ready_for_approval_ids = array_column($approve['media_ready_for_approval'], 'media_id');
+                        $media_ready_for_approval_revs = array_column($approve['media_ready_for_approval'], 'media_rev');
+                        $media_ready_for_approval = array_combine($media_ready_for_approval_ids, $media_ready_for_approval_revs);
+                        $urlParameters = [
+                            'media' => json_encode($media_ready_for_approval),
+                            'do' => 'approve_media_diff',
+                            'status' => 'approve'
+                        ];
                     // the page is not approved
                     } else {
                         $urlParameters = [
