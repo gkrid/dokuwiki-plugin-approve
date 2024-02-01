@@ -2,9 +2,11 @@
 
 use dokuwiki\Extension\Event;
 use dokuwiki\Form\Form;
+use dokuwiki\Form\TagCloseElement;
 use dokuwiki\Form\TagOpenElement;
 use dokuwiki\Form\CheckableElement;
 use dokuwiki\plugin\approve\meta\ApproveMetadata;
+use dokuwiki\plugin\approve\meta\ApproveRevisionInfo;
 
 if(!defined('DOKU_INC')) die();
 
@@ -115,23 +117,49 @@ class action_plugin_approve_revisions extends DokuWiki_Action_Plugin {
          */
         $form = $event->data;
         $last_revision = $INFO['meta']['date']['modified'];
-        $last_revision_position = null;
+        $parent_div_closing = -1;
+        $current_revision_found = false;
         for ($i = 0; $i < $form->elementCount(); $i++) {
             $element = $form->getElementAt($i);
+//            if ($element instanceof TagOpenElement && $element->val() == 'li') {
+//                $parent_li_position = $i;
+//                break;
+//            }
             if ($element instanceof CheckableElement && $element->attr('name') == 'rev2[]') {
                 $revision = $element->attr('value');
                 if ($revision == $last_revision) {
-                    $last_revision_position = $i;
-                    break;
+                    $current_revision_found = true;
                 }
+            } elseif ($current_revision_found && $element instanceof TagCloseElement && $element->val() == 'div') {
+                $parent_div_closing = $i;
+                break;
             }
         }
 
-        $media_revision = $approve_metadata->getMediaRevisions($INFO['id'], $last_revision);
-        $date = array_column($media_revision, 'approved');
-        $html = implode(' ', $date);
-        $form->addHTML('<p>'.$html.'</p>', $last_revision_position);
+        $media_revisions = $approve_metadata->getMediaRevisions($INFO['id'], $last_revision);
+        $pos = $parent_div_closing + 1;
+        $form->addTagOpen('ul', $pos++);
+        foreach ($media_revisions as $revision) {
+            $form->addTagOpen('li', $pos++);
 
+            if ($revision['status'] == 'approved') {
+                $class =  'plugin__approve_old_approved';
+            } elseif ($this->getConf('ready_for_approval') && $revision['status'] == 'ready_for_approval') {
+                $class = 'plugin__approve_ready';
+            }
+
+            $form->addTagOpen('div', $pos++)->addClass('li')->addClass($class);
+            $ApproveRevInfo = new ApproveRevisionInfo($revision);
+            $html = implode(' ', [
+                $ApproveRevInfo->showEditDate(),      // edit date and time
+                $ApproveRevInfo->showFileName(),      // name of page
+                $ApproveRevInfo->showEditor(),        // editor info
+            ]);
+            $form->addHTML($html, $pos++);
+            $form->addTagClose('div', $pos++);
+            $form->addTagClose('li', $pos++);
+        }
+        $form->addTagClose('ul', $pos);
         return true;
     }
 }

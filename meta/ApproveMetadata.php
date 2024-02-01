@@ -210,17 +210,40 @@ class ApproveMetadata
     {
         $sql = 'SELECT ready_for_approval, ready_for_approval_by
                     FROM media_revision
-                    WHERE page=? AND rev=?
+                    WHERE page=? AND rev=? AND ready_for_approval IS NOT NULL
                     GROUP BY ready_for_approval, ready_for_approval_by';
         $ready_for_approval = $this->db->queryAll($sql, $page_id, $page_rev);
+        $ready_for_approval = array_map(function ($v) use ($page_id) {
+            return [
+                'status' => 'ready_for_approval',
+                'date' => strtotime($v['ready_for_approval']),
+                'id' => $page_id,
+                'user' => $v['ready_for_approval_by']
+            ];
+        }, $ready_for_approval);
 
         $sql = 'SELECT approved, approved_by, version
                     FROM media_revision
-                    WHERE page=? AND rev=?
+                    WHERE page=? AND rev=? AND approved IS NOT NULL
                     GROUP BY approved, approved_by, version';
         $approved = $this->db->queryAll($sql, $page_id, $page_rev);
+        $approved = array_map(function ($v) use ($page_id) {
+            return [
+                'status' => 'approved',
+                'date' => strtotime($v['approved']),
+                'id' => $page_id,
+                'user' => $v['approved_by'],
+                'version' => $v['version']
+            ];
+        }, $approved);
 
-        return $approved;
+        $revisions = array_merge($ready_for_approval, $approved);
+        usort($revisions, function ($a, $b) {
+            if ($a['date'] == $b['date']) return 0;
+            return ($a['date'] < $b['date']) ? 1 : -1;
+        });
+
+        return $revisions;
     }
 
     public function getPageVersion($id)
