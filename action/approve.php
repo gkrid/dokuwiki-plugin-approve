@@ -1,12 +1,36 @@
 <?php
 
 use \dokuwiki\ChangeLog\MediaChangeLog;
+use dokuwiki\Extension\ActionPlugin;
+use dokuwiki\plugin\approve\meta\ApproveAcl;
 use dokuwiki\plugin\approve\meta\ApproveMetadata;
 use dokuwiki\Ui\MediaDiff;
 
-if(!defined('DOKU_INC')) die();
+class action_plugin_approve_approve extends ActionPlugin {
 
-class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
+    protected $approve_metadata;
+    protected $approve_acl;
+
+    protected function init(): void {
+        global $INFO;
+
+        try {
+            $this->approve_metadata = new ApproveMetadata(
+                $this->getConf('no_apr_namespaces'),
+                $this->getConf('media_approve')
+            );
+            $this->approve_acl = new ApproveAcl(
+                $INFO['id'],
+                $this->approve_metadata,
+                $this->getConf('strict_approver'),
+                $this->getConf('hide_drafts_for_viewers'),
+                $this->getConf('viewmode'),
+                $this->getConf('ready_for_approval_acl')
+            );
+        } catch (Exception $e) {
+            msg($e->getMessage(), -1);
+        }
+    }
     /**
      * @param Doku_Event_Handler $controller
      */
@@ -18,7 +42,6 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
         $controller->register_hook('ACTION_ACT_PREPROCESS', 'BEFORE', $this, 'handle_approve');
         $controller->register_hook('ACTION_ACT_PREPROCESS', 'BEFORE', $this, 'handle_mark_ready_for_approval');
         $controller->register_hook('ACTION_ACT_PREPROCESS', 'BEFORE', $this, 'handle_viewer');
-        $controller->register_hook('TPL_ACT_RENDER', 'BEFORE', $this, 'handle_display_banner');
         $controller->register_hook('COMMON_WIKIPAGE_SAVE', 'AFTER', $this, 'handle_pagesave_after');
         $controller->register_hook('MEDIA_UPLOAD_FINISH', 'AFTER', $this, 'handle_media_upload_finish_after');
     }
@@ -68,12 +91,7 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
                 return;
             }
 
-            try {
-                $approve_metadata = new ApproveMetadata($this->getConf('media_approve'));
-            } catch (Exception $e) {
-                msg($e->getMessage(), -1);
-                return false;
-            }
+            $this->init();
 
             /** @var helper_plugin_approve $helper */
             $helper = plugin_load('helper', 'approve');
@@ -84,9 +102,9 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
             $media = json_decode($media, true);
             $status = $INPUT->str('status');
             if ($status == 'ready_for_approval' && $helper->client_can_mark_ready_for_approval($INFO['id'])) {
-                $approve_metadata->setMediaReadyForApprovalStatus($INFO['id'], $INFO['client'], array_keys($media));
+                $this->approve_metadata->setMediaReadyForApprovalStatus($INFO['id'], $INFO['client'], array_keys($media));
             } elseif ($helper->client_can_approve($INFO['id'], $approver)) {
-                $approve_metadata->setMediaApprovedStatus($INFO['id'], $INFO['client'], array_keys($media));
+                $this->approve_metadata->setMediaApprovedStatus($INFO['id'], $INFO['client'], array_keys($media));
             }
             header('Location: ' . wl($INFO['id']));
         }
@@ -170,19 +188,14 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
         if (!$helper->use_approve_here($sqlite, $INFO['id'], $approver)) return;
         if (!$helper->client_can_approve($INFO['id'], $approver)) return;
 
-        try {
-            $approve_metadata = new ApproveMetadata($this->getConf('media_approve'));
-        } catch (Exception $e) {
-            msg($e->getMessage(), -1);
-            return false;
-        }
+        $this->init();
 
         $approved = date('c');
         //approved IS NULL prevents from overriding already approved page
         $sqlite->query('UPDATE revision
                         SET approved=?, approved_by=?, version=?
                         WHERE page=? AND current=1 AND approved IS NULL',
-            $approved, $INFO['client'], $approve_metadata->getPageVersion($INFO['id'])+1, $INFO['id']);
+            $approved, $INFO['client'], $this->approve_metadata->getPageVersion($INFO['id'])+1, $INFO['id']);
 
         header('Location: ' . wl($INFO['id']));
     }
@@ -275,22 +288,35 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
         /** @var helper_plugin_approve $helper */
         $helper = plugin_load('helper', 'approve');
 
-        try {
-            $approve_metadata = new ApproveMetadata($this->getConf('media_approve'));
-        } catch (Exception $e) {
-            msg($e->getMessage(), -1);
-            return false;
-        }
+        $this->init();
 
         if ($event->data != 'show') return;
         if (!$INFO['exists']) return;
+
+        if ($this->getConf('media_approve')) {
+//            return $this->handle_display_banner_media_approve();
+        }
+
         if (!$helper->use_approve_here($sqlite, $INFO['id'], $approver)) return;
+
+
+
+//        $menu = [
+//            'status' => null,
+//            'date' => null,
+//            'user' => null,
+//            'latest_approved' => null,
+//            'latest_draft' => null,
+//            'approve' => null,
+//            'marked_approve_ready' => null,
+//        ];
 
 //        $last_change_date = p_get_metadata($INFO['id'], 'last_change date');
         $last_change_date = @filemtime(wikiFN($INFO['id']));
         $rev = !$INFO['rev'] ? $last_change_date : $INFO['rev'];
 
-        $approve = $approve_metadata->getPageRevision($INFO['id'], $rev);
+        $approve = $this->approve_metadata->getPageRevision($INFO['id'], $rev);
+
         $last_approved_rev = $helper->find_last_approved($sqlite, $INFO['id']);
 
         $classes = [];
@@ -319,8 +345,7 @@ class action_plugin_approve_approve extends DokuWiki_Action_Plugin {
 
             if($this->getConf('banner_long')) {
                 ptln(' ' . $this->getLang('by') . ' ' . userlink($approve['approved_by'], true));
-                $version = $approve_metadata->getPageVersion($ID);
-                ptln(' (' . $this->getLang('version') .  ': ' . $version . ')');
+                ptln(' (' . $this->getLang('version') .  ': ' . $approve['version'] . ')');
             }
 
             //not the newest page

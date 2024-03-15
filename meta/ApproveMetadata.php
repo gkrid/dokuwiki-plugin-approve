@@ -12,10 +12,31 @@ class ApproveMetadata
     protected $db;
     protected $media_approve;
 
-    public function __construct($media_approve)
+    public function __construct(string $no_apr_namespaces, bool $media_approve)
     {
         $this->db = new SQLiteDB('approve', DOKU_PLUGIN . 'sqlite/db/');
+        $this->no_apr_namespaces = $no_apr_namespaces;
+        $this->no_apr_namespaces_array  = array_map(function ($namespace) {
+            return ltrim($namespace, ':');
+        }, preg_split('/\s+/', $no_apr_namespaces,-1,PREG_SPLIT_NO_EMPTY));
+        $this->initNoApproveNamespaces();
         $this->media_approve = $media_approve;
+    }
+    protected function initNoApproveNamespaces()
+    {
+        $config_key = 'no_apr_namespaces';
+        $current_value = $this->getConf($config_key);
+        if ($current_value != $this->no_apr_namespaces) {
+            $this->db->query('BEGIN TRANSACTION');
+            $this->setConf($config_key, $this->no_apr_namespaces);
+            $pages_meta = $this->getPagesMetadata();
+            foreach ($pages_meta as $page_meta) {
+                $page_id = $page_meta['page'];
+                $hidden = $this->pageInHiddenNamespace($page_id);
+                $this->setPageHiddenStatus($page_id, $hidden);
+            }
+            $this->db->query('COMMIT TRANSACTION');
+        }
     }
 
     public function getPages($user=null, $states=['approved', 'draft', 'ready_for_approval'], $namespace='', $filter=''): array
@@ -129,13 +150,13 @@ class ApproveMetadata
                 }
             }
         }
-        $drafts = array_filter($media_page_revisions, function ($media) {
+        $drafts = array_values(array_filter($media_page_revisions, function ($media) {
            return $media['status'] == 'draft';
-        });
+        }));
         $page['media_drafts'] = $drafts;
-        $ready_for_approval = array_filter($media_page_revisions, function ($media) {
+        $ready_for_approval = array_values(array_filter($media_page_revisions, function ($media) {
             return $media['status'] == 'ready_for_approval';
-        });
+        }));
         $page['media_ready_for_approval'] = $ready_for_approval;
         if ($drafts) {
              // get the oldest outdated media
@@ -200,10 +221,35 @@ class ApproveMetadata
         }
         $page['id'] = $id;
         $page['rev'] = $rev;
+        $page['version'] = $this->getPageVersion($id);
         $page = $this->setPageStatus($page);
         // check if we don't have outdated media files - makes sens only for current page revision
         $page = $this->applyMediaApprove($page);
         return $page;
+    }
+
+    public function getMediaRevision($page_id, $page_rev, $media_rev) {
+        $media_revisions = $this->getMediaRevisions($page_id, $page_rev);
+        $media_revision = current(array_filter($media_revisions, function($revision) use ($media_rev) {
+            return $revision['date'] == $media_rev;
+        }));
+        if ($media_revision) {
+            if ($media_revision['status'] == 'ready_for_approval') {
+                return [
+                    'status' => 'ready_for_approval',
+                    'ready_for_approval' => date('c', $media_revision['date']),
+                    'ready_for_approval_by' => $media_revision['user']
+                ];
+            } elseif ($media_revision['status'] == 'approved') {
+                return [
+                    'status' => 'approved',
+                    'approved' => date('c', $media_revision['date']),
+                    'approved_by' => $media_revision['user'],
+                    'version' => $media_revision['version']
+                ];
+            }
+        }
+        return [];
     }
 
     public function getMediaRevisions($page_id, $page_rev)
@@ -257,6 +303,32 @@ class ApproveMetadata
         return max($max_page_version, $max_media_version, 0);
     }
 
+    public function getLastRev($id, $status)
+    {
+        if ($status == 'approved') {
+            $sql = 'SELECT rev FROM revision WHERE page=? AND approved IS NOT NULL ORDER BY rev DESC LIMIT 1';
+            return $this->db->queryValue($sql, $id);
+        } elseif ($status == 'ready_for_approval') {
+            $sql = 'SELECT rev FROM revision WHERE page=? AND ready_for_approval IS NOT NULL ORDER BY rev DESC LIMIT 1';
+            return $this->db->queryValue($sql, $id);
+        }
+        $sql = 'SELECT rev FROM revision WHERE page=? AND current=1';
+        return $this->db->queryValue($sql, $id);
+    }
+
+    public function getLastAt($id, $status=null)
+    {
+        $sql = 'SELECT rev FROM revision WHERE page=? AND current=1';
+        $rev = $this->db->queryValue($sql, $id);
+        $media_revisions = $this->getMediaRevisions($id, $rev);
+        foreach ($media_revisions as $media_revision) {
+            if (!$status || $media_revision['status'] == $status) {
+                return $media_revision['date'];
+            }
+        }
+        return $this->getLastRev($id, $status);
+    }
+
     public function setMediaReadyForApprovalStatus($page_id, $client, $media_ids)
     {
         $timestamp = date('c');
@@ -307,5 +379,45 @@ class ApproveMetadata
                 $this->db->saveRecord('media_revision', $data);
             }
         }
+    }
+
+    public function getPagesMetadata(): array
+    {
+        $sql = 'SELECT page, approver, hidden FROM page';
+        return $this->db->queryAll($sql);
+    }
+
+    public function getPageMetadata($page_id): ?array
+    {
+        $sql = 'SELECT approver FROM page WHERE page=? AND hidden != 1';
+        return $this->db->queryRecord($sql, $page_id);
+    }
+
+    public function getConf(string $key): string
+    {
+        $sql = 'SELECT value FROM config WHERE key=?';
+        return $this->db->queryValue($sql, $key);
+    }
+
+    public function setConf(string $key, string $value)
+    {
+        $sql = 'UPDATE config SET value=? WHERE key=?';
+        $this->db->exec($sql, $value, $key);
+    }
+
+    public function setPageHiddenStatus(string $page_id, bool $hidden)
+    {
+        $sql = 'UPDATE page SET hidden=? WHERE page=?';
+        $this->db->query($sql, $hidden, $page_id);
+    }
+
+    public function pageInHiddenNamespace(string $page_id): bool {
+        $page_id = ltrim($page_id, ':');
+        foreach ($this->no_apr_namespaces_array as $namespace) {
+            if (substr($page_id, 0, strlen($namespace)) == $namespace) {
+                return true;
+            }
+        }
+        return false;
     }
 }

@@ -47,7 +47,10 @@ class action_plugin_approve_revisions extends DokuWiki_Action_Plugin {
 //        $approve_revisions = array_combine(array_column($approve_revisions, 'rev'), $approve_revisions);
 
         try {
-            $approve_metadata = new ApproveMetadata($this->getConf('media_approve'));
+            $approve_metadata = new ApproveMetadata(
+                $this->getConf('no_apr_namespaces'),
+                $this->getConf('media_approve')
+            );
         } catch (Exception $e) {
             msg($e->getMessage(), -1);
             return false;
@@ -106,7 +109,10 @@ class action_plugin_approve_revisions extends DokuWiki_Action_Plugin {
         if (!$helper->use_approve_here($sqlite, $INFO['id'])) return;
 
         try {
-            $approve_metadata = new ApproveMetadata($this->getConf('media_approve'));
+            $approve_metadata = new ApproveMetadata(
+                $this->getConf('no_apr_namespaces'),
+                $this->getConf('media_approve')
+            );
         } catch (Exception $e) {
             msg($e->getMessage(), -1);
             return false;

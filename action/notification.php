@@ -48,7 +48,10 @@ class action_plugin_approve_notification extends DokuWiki_Action_Plugin
 
         $user = $event->data['user'];
         try {
-            $approveMetadata = new ApproveMetadata($this->getConf('media_approve'));
+            $approveMetadata = new ApproveMetadata(
+                $this->getConf('no_apr_namespaces'),
+                $this->getConf('media_approve')
+            );
         } catch (Exception $e) {
             msg($e->getMessage(), -1);
             return;

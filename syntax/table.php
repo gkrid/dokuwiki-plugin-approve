@@ -129,7 +129,10 @@ class syntax_plugin_approve_table extends DokuWiki_Syntax_Plugin {
         global $auth;
 
         try {
-            $approveMetadata = new ApproveMetadata($this->getConf('media_approve'));
+            $approveMetadata = $this->approve_metadata = new ApproveMetadata(
+                $this->getConf('no_apr_namespaces'),
+                $this->getConf('media_approve')
+            );
         } catch (Exception $e) {
             msg($e->getMessage(), -1);
             return;
