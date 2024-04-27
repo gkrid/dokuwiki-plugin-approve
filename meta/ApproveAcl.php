@@ -20,6 +20,14 @@ class ApproveAcl
         $this->ready_for_approval_acl = preg_split('/\s+/', $ready_for_approval_acl, -1, PREG_SPLIT_NO_EMPTY);
     }
 
+    public function useApproveHere() {
+        $page_metadata = $this->approve_metadata->getPageMetadata($this->page_id);
+        if ($page_metadata === null) { // do not use approve plugin here
+            return false;
+        }
+        return true;
+    }
+
     public function clientCanApprove(): bool
     {
         global $INFO;
