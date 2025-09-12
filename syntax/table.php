@@ -124,6 +124,7 @@ class syntax_plugin_approve_table extends SyntaxPlugin {
 
 
         if ($params['approver'] == '$USER$') {
+            if (!isset($INFO['userinfo'])) return;  // only works for login users
             $params['approver'] = $INFO['client'];
         }
 
