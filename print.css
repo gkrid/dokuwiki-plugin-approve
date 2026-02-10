@@ -2,6 +2,10 @@
     display: none;
 }
 
+.plugin__approve_printonly {
+    display: inline;
+}
+
 #plugin__approve_printheader {
     display: table;
 }
