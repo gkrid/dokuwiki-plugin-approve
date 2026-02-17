@@ -143,7 +143,7 @@ class action_plugin_approve_approve extends ActionPlugin {
 
         /** @var helper_plugin_approve_tpl $tpl */
         $tpl = $this->loadHelper('approve_tpl');
-        $tpl->banner($event->data);
+        echo $tpl->banner($event->data);
     }
 
     /**
