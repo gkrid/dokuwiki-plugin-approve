@@ -203,7 +203,8 @@ class helper_plugin_approve_db extends Plugin
 
         if ($user !== '') {
             $user_data = $auth->getUserData($user);
-            $user_groups = $user_data['grps'];
+            // If export_pdf template contains @APPROVER@ prevent Error: Call to undefined method helper_plugin_approve_db::getDB()
+            $user_groups = isset($user_data['grps']) && is_array($user_data['grps']) ? $user_data['grps'] : [];
             $pages = array_filter($pages, function ($page) use ($user, $user_groups) {
                 return $page['approver'][0] == '@' && in_array(substr($page['approver'], 1), $user_groups) ||
                     $page['approver'] == $user;
