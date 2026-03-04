@@ -121,7 +121,8 @@ class syntax_plugin_approve_table extends SyntaxPlugin {
         /** @var DokuWiki_Auth_Plugin $auth */
         global $auth;
 
-
+        // safeguard for CLI rendering without proper environment (only error prevention)
+        if (is_null($auth)) auth_setup();
 
         if ($params['approver'] == '$USER$') {
             if (!isset($INFO['userinfo'])) return;  // only works for login users
