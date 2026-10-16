@@ -15,6 +15,8 @@ $lang['hdr_page'] = 'Nazwa strony';
 $lang['hdr_state'] = 'Status';
 $lang['hdr_updated'] = 'Data';
 $lang['hdr_approver'] = $lang['approver'];
+$lang['hdr_version'] = 'Wersja';
+
 
 
 $lang['all_approved'] = 'Zatwierdzone';

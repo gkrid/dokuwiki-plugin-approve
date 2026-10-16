@@ -191,7 +191,7 @@ class helper_plugin_approve_db extends Plugin
         global $auth;
 
         $sql = 'SELECT page.page AS id, page.approver, revision.rev, revision.approved, revision.approved_by,
-                    revision.ready_for_approval, revision.ready_for_approval_by,
+                    revision.ready_for_approval, revision.ready_for_approval_by, revision.version,
                     LENGTH(page.page) - LENGTH(REPLACE(page.page, \':\', \'\')) AS colons
                     FROM page INNER JOIN revision ON page.page = revision.page
                     WHERE page.hidden = 0 AND revision.current=1 AND page.page GLOB ? AND page.page REGEXP ?

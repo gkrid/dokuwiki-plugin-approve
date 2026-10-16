@@ -135,6 +135,7 @@ class syntax_plugin_approve_table extends SyntaxPlugin {
         $renderer->doc .= '<th>' . $this->getLang('hdr_state') . '</th>';
         $renderer->doc .= '<th>' . $this->getLang('hdr_updated') . '</th>';
         $renderer->doc .= '<th>' . $this->getLang('hdr_approver') . '</th>';
+        $renderer->doc .= '<th>' . $this->getLang('hdr_version') . '</th>';
         $renderer->doc .= '</tr>';
 
 
@@ -155,6 +156,7 @@ class syntax_plugin_approve_table extends SyntaxPlugin {
             $approved_by = $page['approved_by'];
             $ready_for_approval = strtotime($page['ready_for_approval']);
             $ready_for_approval_by = $page['ready_for_approval_by'];
+            $version = $page['version'];
 
             $pageNS = getNS($id);
 
@@ -226,6 +228,9 @@ class syntax_plugin_approve_table extends SyntaxPlugin {
             } else {
                 $renderer->doc .= '---';
             }
+
+            $renderer->doc .= '</td><td>';
+            $renderer->doc .= $version;
             $renderer->doc .= '</td></tr>';
         }
 
