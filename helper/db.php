@@ -267,6 +267,15 @@ class helper_plugin_approve_db extends Plugin
         $this->db->exec('UPDATE revision SET page=? WHERE page=?', $new_page_id, $old_page_id);
     }
 
+    public function getLatestApprovedRevision(string $page_id): ?array
+    {
+        $sql = 'SELECT revision.rev, revision.approved, revision.approved_by, revision.version
+                FROM revision INNER JOIN page ON page.page = revision.page
+                WHERE revision.page=? AND page.hidden=0 AND revision.approved IS NOT NULL
+                ORDER BY revision.rev DESC LIMIT 1';
+        return $this->db->queryRecord($sql, $page_id);
+    }
+
     public function getLastDbRev(string $page_id, ?string $status=null): ?int
     {
         if ($status == 'approved') {

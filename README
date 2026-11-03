@@ -12,6 +12,12 @@ will not work!
 Please refer to http://www.dokuwiki.org/plugins for additional info
 on how to install plugins in DokuWiki.
 
+Remote API: plugin.approve.getLatestApprovedRevision(page) requires read access.
+It returns {found: false} when no approved revision exists, otherwise
+{found: true, rev, approved, approved_by, version}. rev and approved are Unix
+timestamps; version is omitted when unavailable. Missing pages and denied
+access produce RPC errors.
+
 ----
 Copyright (C) Szymon Olewniczak <it@rid.pl>
 
