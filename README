@@ -12,6 +12,14 @@ will not work!
 Please refer to http://www.dokuwiki.org/plugins for additional info
 on how to install plugins in DokuWiki.
 
+Remote API: plugin.approve.getLatestApprovedRevision(page) requires read access
+and returns null when no approved revision exists (including pages outside the
+plugin's scope). Otherwise it returns rev, approved (Unix timestamp),
+approved_by and version. Missing pages and denied access produce RPC errors.
+
+Run the standalone database and access checks with:
+php tests/latest-approved.php
+
 ----
 Copyright (C) Szymon Olewniczak <it@rid.pl>
 

@@ -53,6 +53,36 @@ class remote_plugin_approve extends RemotePlugin
     }
 
     /**
+     * Get the latest approved revision and its approval metadata.
+     *
+     * @param string $page The page ID
+     * @return array|null Revision, approval timestamp, approver and version, or null if none exists
+     * @throws RemoteException
+     */
+    public function getLatestApprovedRevision($page)
+    {
+        $page = cleanID($page);
+        if (auth_quickaclcheck($page) < AUTH_READ) {
+            throw new RemoteException('You are not allowed to read this page', 111);
+        }
+        if (!page_exists($page)) {
+            throw new RemoteException('Page does not exist', 121);
+        }
+
+        /** @var helper_plugin_approve_db $db */
+        $db = plugin_load('helper', 'approve_db');
+        $revision = $db->getLatestApprovedRevision($page);
+        if ($revision === null) return null;
+
+        return [
+            'rev' => (int)$revision['rev'],
+            'approved' => strtotime($revision['approved']),
+            'approved_by' => (string)$revision['approved_by'],
+            'version' => $revision['version'] === null ? null : (int)$revision['version'],
+        ];
+    }
+
+    /**
      * Set the approval status of a page
      *
      * Mark a given page as approved or ready for approval
