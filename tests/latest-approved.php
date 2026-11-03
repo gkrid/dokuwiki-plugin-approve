@@ -4,6 +4,9 @@ namespace dokuwiki\Extension {
     class Plugin {}
     class RemotePlugin {}
 }
+namespace dokuwiki\Remote\Response {
+    abstract class ApiResponse { abstract public function __toString(): string; }
+}
 namespace dokuwiki\Remote {
     class RemoteException extends \Exception {}
 }
@@ -17,6 +20,7 @@ namespace {
     function plugin_load($type, $name) { global $helper; return $helper; }
 
     require __DIR__ . '/../helper/db.php';
+    require __DIR__ . '/../ApprovalRemoteResponse.php';
     require __DIR__ . '/../remote.php';
 
     class TestDb {
@@ -42,14 +46,18 @@ namespace {
     $helper = new TestHelper($db);
     $api = new \remote_plugin_approve();
     $db->pdo->exec("INSERT INTO page (page) VALUES ('test:page')");
-    check($api->getLatestApprovedRevision(':test:page') === null, 'No approval');
+    check(get_object_vars($api->getLatestApprovedRevision(':test:page')) === ['found' => false], 'No approval');
     $db->pdo->exec("INSERT INTO revision (page, rev, approved, approved_by, version) VALUES
         ('test:page', 100, '2026-01-01T00:00:00+00:00', 'alice', 1),
         ('test:page', 200, '2026-02-01T00:00:00+00:00', 'bob', 2),
         ('test:page', 300, NULL, NULL, NULL)");
-    check($api->getLatestApprovedRevision('test:page') === [
-        'rev' => 200, 'approved' => 1769904000, 'approved_by' => 'bob', 'version' => 2,
+    check(get_object_vars($api->getLatestApprovedRevision('test:page')) === [
+        'found' => true, 'rev' => 200, 'approved' => 1769904000, 'approved_by' => 'bob', 'version' => 2,
     ], 'Latest approved revision and metadata');
+    $db->pdo->exec("UPDATE revision SET version=NULL WHERE page='test:page' AND rev=200");
+    check(get_object_vars($api->getLatestApprovedRevision('test:page')) === [
+        'found' => true, 'rev' => 200, 'approved' => 1769904000, 'approved_by' => 'bob',
+    ], 'Missing version is omitted');
     $permission = 0;
     try {
         $api->getLatestApprovedRevision('test:page');
@@ -67,6 +75,6 @@ namespace {
     }
     $exists = true;
     $db->pdo->exec("UPDATE page SET hidden=1 WHERE page='test:page'");
-    check($api->getLatestApprovedRevision('test:page') === null, 'Hidden namespace');
+    check(get_object_vars($api->getLatestApprovedRevision('test:page')) === ['found' => false], 'Hidden namespace');
     echo "Latest approved revision checks passed\n";
 }

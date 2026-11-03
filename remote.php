@@ -2,6 +2,7 @@
 
 use dokuwiki\Extension\RemotePlugin;
 use dokuwiki\plugin\approve\PageRemoteResponse;
+use dokuwiki\plugin\approve\ApprovalRemoteResponse;
 use dokuwiki\Remote\RemoteException;
 
 /**
@@ -56,7 +57,7 @@ class remote_plugin_approve extends RemotePlugin
      * Get the latest approved revision and its approval metadata.
      *
      * @param string $page The page ID
-     * @return array|null Revision, approval timestamp, approver and version, or null if none exists
+     * @return ApprovalRemoteResponse The found flag and, when found, revision approval metadata
      * @throws RemoteException
      */
     public function getLatestApprovedRevision($page)
@@ -71,15 +72,7 @@ class remote_plugin_approve extends RemotePlugin
 
         /** @var helper_plugin_approve_db $db */
         $db = plugin_load('helper', 'approve_db');
-        $revision = $db->getLatestApprovedRevision($page);
-        if ($revision === null) return null;
-
-        return [
-            'rev' => (int)$revision['rev'],
-            'approved' => strtotime($revision['approved']),
-            'approved_by' => (string)$revision['approved_by'],
-            'version' => $revision['version'] === null ? null : (int)$revision['version'],
-        ];
+        return new ApprovalRemoteResponse($db->getLatestApprovedRevision($page));
     }
 
     /**
