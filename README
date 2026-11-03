@@ -13,24 +13,10 @@ Please refer to http://www.dokuwiki.org/plugins for additional info
 on how to install plugins in DokuWiki.
 
 Remote API: plugin.approve.getLatestApprovedRevision(page) requires read access.
-JSON-RPC and XML-RPC return an object/struct with a boolean found field. When
-found is false, no approved revision exists (including pages outside the
-plugin's scope). When true, rev and approved are integer Unix timestamps,
-approved_by is a string, and version is an integer if available; otherwise
-version is omitted. Missing pages and denied access produce RPC errors.
-This replaces the earlier experimental null-based response contract.
-
-Run the standalone database and access checks with:
-php tests/latest-approved.php
-
-To test both actual RPC endpoints against a deployed test wiki, set
-APPROVE_RPC_TOKEN to a read-only bearer token and APPROVE_RPC_FIXTURES to the
-path of a JSON fixture file, then run python3 tests/rpc-integration.py.
-See tests/rpc-fixtures.example.json. The file contains base_url and cases:
-approved, unapproved, without_version, hidden, denied, and missing. Each case has page and either expected (the exact RPC
-object, with numeric timestamps) or error (a substring of the RPC fault).
-The without_version page must be approved with a NULL database version; denied
-must exist but be unreadable by the token. Keep credentials out of the file.
+It returns {found: false} when no approved revision exists, otherwise
+{found: true, rev, approved, approved_by, version}. rev and approved are Unix
+timestamps; version is omitted when unavailable. Missing pages and denied
+access produce RPC errors.
 
 ----
 Copyright (C) Szymon Olewniczak <it@rid.pl>
